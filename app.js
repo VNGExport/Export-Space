@@ -9,7 +9,8 @@
    GOOGLE APPS SCRIPT API
    วาง Web App URL ที่ได้จาก Deploy ตรงนี้
 ══════════════════════════════════════════ */
-const API_URL = "https://script.google.com/a/macros/vanachai.com/s/AKfycbyCaKlsKm0Cdmh7xJZt6RPV-2dOj8girN59E8ZeyZV0JJFg8J8x0vGjhSbxAbDdgYlFGg/exec";
+const API_URL = (typeof CONFIG !== 'undefined') ? CONFIG.SHEETS_API
+  : "https://script.google.com/a/macros/vanachai.com/s/AKfycbzbF1MPtbGpFrhblZZH_p-XirBR0ZC1Kx0RV08l5qefz2pgv1ZjtC7Rn4wGLeyo_RKtsA/exec";
 
 /* ── API HELPERS (GET only — หลีกเลี่ยง CORS) ── */
 async function apiGet(sheet) {
@@ -66,7 +67,7 @@ const LINK_ICONS = {
 /* ══════════════════════════════════════════
    INIT
 ══════════════════════════════════════════ */
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   applyTheme(state.theme);
   applyAccent(state.accent);
   applyFont(state.font);
@@ -84,6 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
   bindProfileTabs();
   bindCalNav();
   syncSettingsUI();
+  await loadPostsFromSheet();
 });
 
 /* ══════════════════════════════════════════
@@ -171,6 +173,80 @@ function bindThemeToggle() {
     syncThemeRadio(next);
     showToast(`ธีม: ${next === 'light' ? 'Light ☀️' : next === 'dark' ? 'Dark 🌙' : 'Navy 🌊'}`);
   });
+}
+
+/* ══════════════════════════════════════════
+   LOAD POSTS FROM SHEET
+══════════════════════════════════════════ */
+async function loadPostsFromSheet() {
+  const feed = document.getElementById('posts-feed');
+  if (!feed) return;
+
+  // แสดง loading
+  feed.innerHTML = `<div style="text-align:center;padding:32px;color:var(--text-tertiary)">
+    <i class="ti ti-loader" style="font-size:24px"></i><br>กำลังโหลดโพสต์…
+  </div>`;
+
+  const posts = await apiGet('Posts');
+
+  if (!posts || posts.length === 0) {
+    feed.innerHTML = `<div style="text-align:center;padding:32px;color:var(--text-tertiary)">
+      ยังไม่มีโพสต์ — เป็นคนแรกที่โพสต์!
+    </div>`;
+    return;
+  }
+
+  // เรียงจากใหม่ไปเก่า
+  const sorted = posts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  feed.innerHTML = sorted.map(p => {
+    const initials = (p.author || '?').split(' ').map(w => w[0]).join('').slice(0, 2);
+    const timeAgo  = formatTime(p.created_at);
+    return `
+    <article class="post-card" data-post-id="${escapeHTML(p.id)}">
+      <div class="post-header">
+        <div class="avatar av-navy" aria-hidden="true">${escapeHTML(initials)}</div>
+        <div class="post-meta-info">
+          <div class="post-author">${escapeHTML(p.author)} <span class="post-dept">${escapeHTML(p.dept || '')}</span></div>
+          <div class="post-time"><i class="ti ti-clock" aria-hidden="true"></i> ${timeAgo} · <i class="ti ti-world" aria-hidden="true"></i> ทีม</div>
+        </div>
+        <button class="post-more-btn" aria-label="ตัวเลือกเพิ่มเติม"><i class="ti ti-dots" aria-hidden="true"></i></button>
+      </div>
+      <div class="post-body"><p>${escapeHTML(p.content || '')}</p></div>
+      <div class="post-stats">
+        <div class="post-react-summary">${p.likes > 0
+          ? `<span style="font-size:13px">👍 ${p.likes} คน</span>`
+          : `<span style="color:var(--text-tertiary);font-size:13px">ยังไม่มีปฏิกิริยา</span>`}
+        </div>
+        <span>0 ความคิดเห็น</span>
+      </div>
+      <div class="post-actions">
+        <button class="post-action-btn like-btn" aria-label="ถูกใจ" data-post-id="${escapeHTML(p.id)}">
+          <i class="ti ti-thumb-up" aria-hidden="true"></i> ถูกใจ
+        </button>
+        <button class="post-action-btn" aria-label="ความคิดเห็น">
+          <i class="ti ti-message" aria-hidden="true"></i> ความคิดเห็น
+        </button>
+        <button class="post-action-btn" aria-label="แชร์">
+          <i class="ti ti-share" aria-hidden="true"></i> แชร์
+        </button>
+      </div>
+    </article>`;
+  }).join('');
+
+  // bind like buttons ใหม่
+  feed.querySelectorAll('.like-btn').forEach(btn => {
+    btn.addEventListener('click', handleLike);
+  });
+}
+
+function formatTime(isoString) {
+  if (!isoString) return 'ไม่ทราบเวลา';
+  const diff = Math.floor((Date.now() - new Date(isoString)) / 1000);
+  if (diff < 60)   return 'เมื่อกี้';
+  if (diff < 3600) return `${Math.floor(diff / 60)} นาทีที่แล้ว`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} ชั่วโมงที่แล้ว`;
+  return `${Math.floor(diff / 86400)} วันที่แล้ว`;
 }
 
 /* ══════════════════════════════════════════
