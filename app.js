@@ -11,10 +11,11 @@
 ══════════════════════════════════════════ */
 const API_URL = "https://script.google.com/a/macros/vanachai.com/s/AKfycbyCaKlsKm0Cdmh7xJZt6RPV-2dOj8girN59E8ZeyZV0JJFg8J8x0vGjhSbxAbDdgYlFGg/exec";
 
-/* ── API HELPERS ── */
+/* ── API HELPERS (GET only — หลีกเลี่ยง CORS) ── */
 async function apiGet(sheet) {
   try {
-    const res = await fetch(`${API_URL}?sheet=${sheet}`);
+    const url = `${API_URL}?action=get&sheet=${encodeURIComponent(sheet)}`;
+    const res = await fetch(url);
     const json = await res.json();
     return json.status === 'ok' ? json.data : [];
   } catch (e) {
@@ -25,14 +26,15 @@ async function apiGet(sheet) {
 
 async function apiPost(action, sheet, data = {}, id = null) {
   try {
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action, sheet, data, id })
-    });
+    // ใช้ GET แทน POST เพื่อหลีกเลี่ยง CORS preflight
+    const params = new URLSearchParams({ action, sheet });
+    if (id) params.set('id', id);
+    Object.entries(data).forEach(([k, v]) => params.set(k, v));
+    const res = await fetch(`${API_URL}?${params.toString()}`);
     const json = await res.json();
     return json.status === 'ok' ? json.data : null;
   } catch (e) {
-    console.error('API POST error:', e);
+    console.error('API error:', e);
     return null;
   }
 }
