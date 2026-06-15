@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ExportSpace — แผนก Export & Logistics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-theme="light">
+
+<!-- ───── TOP NAV ───── -->
+<nav class="topnav" id="topnav">
+  <div class="topnav-inner">
+    <a class="brand" href="#">
+      <div class="brand-mark">EX</div>
+      <span class="brand-name">ExportSpace</span>
+    </a>
+
+    <div class="nav-search-wrap">
+      <i class="ti ti-search nav-search-icon" aria-hidden="true"></i>
+      <input class="nav-search" type="text" placeholder="ค้นหาใน ExportSpace…" aria-label="ค้นหา">
+    </div>
+
+    <div class="nav-center-tabs" role="tablist" aria-label="เมนูหลัก">
+      <button class="nctab active" data-page="home" aria-selected="true" role="tab">
+        <i class="ti ti-home" aria-hidden="true"></i>
+        <span class="nctab-label">หน้าแรก</span>
+      </button>
+      <button class="nctab" data-page="board" aria-selected="false" role="tab">
+        <i class="ti ti-speakerphone" aria-hidden="true"></i>
+        <span class="nctab-label">กระดานข่าว</span>
+      </button>
+      <button class="nctab" data-page="myspace" aria-selected="false" role="tab">
+        <i class="ti ti-user-circle" aria-hidden="true"></i>
+        <span class="nctab-label">My Space</span>
+      </button>
+      <button class="nctab" data-page="calendar" aria-selected="false" role="tab">
+        <i class="ti ti-calendar" aria-hidden="true"></i>
+        <span class="nctab-label">ปฏิทิน</span>
+      </button>
+      <button class="nctab" data-page="settings" aria-selected="false" role="tab">
+        <i class="ti ti-settings" aria-hidden="true"></i>
+        <span class="nctab-label">ตั้งค่า</span>
+      </button>
+    </div>
+
+    <div class="nav-actions">
+      <button class="nav-action-btn" id="theme-toggle" aria-label="เปลี่ยนธีม" title="เปลี่ยน light/dark">
+        <i class="ti ti-moon" aria-hidden="true"></i>
+      </button>
+      <button class="nav-action-btn" aria-label="แจ้งเตือน" title="แจ้งเตือน">
+        <i class="ti ti-bell" aria-hidden="true"></i>
+        <span class="notif-badge">3</span>
+      </button>
+      <button class="nav-action-btn" aria-label="ข้อความ" title="ข้อความ">
+        <i class="ti ti-message-circle" aria-hidden="true"></i>
+        <span class="notif-badge">1</span>
+      </button>
+      <button class="avatar-btn" id="user-avatar-btn" aria-label="เมนูผู้ใช้">
+        <div class="avatar av-navy" aria-hidden="true">รว</div>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<!-- ───── APP SHELL ───── -->
+<div class="app-shell">
+
+  <!-- LEFT SIDEBAR -->
+  <aside class="sidebar-left" id="sidebar-left" aria-label="เมนูนำทาง">
+    <div class="sidebar-inner">
+
+      <!-- user card -->
+      <div class="sb-user-card" data-page-trigger="myspace">
+        <div class="avatar av-navy sb-avatar" aria-hidden="true">รว</div>
+        <div class="sb-user-info">
+          <div class="sb-user-name">Ravee Digital Space</div>
+          <div class="sb-user-role">Export & Logistics · Admin</div>
+        </div>
+      </div>
+
+      <!-- main nav -->
+      <nav class="sb-nav" aria-label="เมนูด้านข้าง">
+        <button class="sb-item active" data-page="home">
+          <span class="sb-icon sb-icon-blue"><i class="ti ti-home" aria-hidden="true"></i></span>
+          <span class="sb-label">หน้าแรก</span>
+        </button>
+        <button class="sb-item" data-page="board">
+          <span class="sb-icon sb-icon-green"><i class="ti ti-speakerphone" aria-hidden="true"></i></span>
+          <span class="sb-label">กระดานข่าว</span>
+          <span class="sb-badge" aria-label="2 รายการใหม่">2</span>
+        </button>
+        <button class="sb-item" data-page="myspace">
+          <span class="sb-icon sb-icon-purple"><i class="ti ti-user-circle" aria-hidden="true"></i></span>
+          <span class="sb-label">My Space</span>
+        </button>
+        <button class="sb-item" data-page="calendar">
+          <span class="sb-icon sb-icon-amber"><i class="ti ti-calendar" aria-hidden="true"></i></span>
+          <span class="sb-label">ปฏิทิน</span>
+        </button>
+        <button class="sb-item" data-page="settings">
+          <span class="sb-icon sb-icon-slate"><i class="ti ti-settings" aria-hidden="true"></i></span>
+          <span class="sb-label">ตั้งค่า</span>
+        </button>
+      </nav>
+
+      <div class="sb-divider"></div>
+
+      <!-- quick links section -->
+      <div class="sb-section-label">ลิงก์ด่วน</div>
+      <div class="sb-links" id="quick-links-list">
+        <a class="sb-link-item" href="#" data-tooltip="ระบบ C/O Requests">
+          <span class="sb-link-icon" style="background:#EAF3DE"><i class="ti ti-file-certificate" style="color:#2D6A4F" aria-hidden="true"></i></span>
+          <span class="sb-link-name">Origin Desk</span>
+        </a>
+        <a class="sb-link-item" href="#" data-tooltip="ยื่นเอกสารศุลกากรออนไลน์">
+          <span class="sb-link-icon" style="background:#DBEAFE"><i class="ti ti-forms" style="color:#1D4ED8" aria-hidden="true"></i></span>
+          <span class="sb-link-name">e-Form ศุลกากร</span>
+        </a>
+        <a class="sb-link-item" href="#" data-tooltip="ธนาคาร Kasikorn L/C Portal">
+          <span class="sb-link-icon" style="background:#FDF3DC"><i class="ti ti-building-bank" style="color:#C8972B" aria-hidden="true"></i></span>
+          <span class="sb-link-name">KBank L/C Portal</span>
+        </a>
+        <a class="sb-link-item" href="#" data-tooltip="ติดตาม Shipment">
+          <span class="sb-link-icon" style="background:#FAF5FF"><i class="ti ti-ship" style="color:#7C3AED" aria-hidden="true"></i></span>
+          <span class="sb-link-name">Freight Tracker</span>
+        </a>
+      </div>
+
+      <button class="sb-add-link" id="add-link-btn" aria-label="เพิ่มลิงก์ด่วน">
+        <i class="ti ti-plus" aria-hidden="true"></i>
+        <span>เพิ่มลิงก์</span>
+      </button>
+
+    </div>
+  </aside>
+
+  <!-- ───── MAIN CONTENT ───── -->
+  <main class="main-content" id="main-content">
+
+    <!-- PAGE: HOME -->
+    <div class="page active" id="page-home">
+      <div class="feed-layout">
+        <div class="feed-col">
+
+          <!-- Stories -->
+          <section class="stories-row" aria-label="Stories">
+            <article class="story story-create">
+              <div class="story-av-wrap">
+                <div class="avatar av-navy story-av">รว</div>
+                <div class="story-plus-btn" aria-hidden="true"><i class="ti ti-plus"></i></div>
+              </div>
+              <span class="story-label">สร้าง Story</span>
+            </article>
+            <article class="story" style="--sg1:#1D4E8F;--sg2:#0B2545">
+              <div class="story-av-wrap"><div class="avatar av-red story-av">ส</div></div>
+              <span class="story-label">🚨 ด่วน: C/O UAE</span>
+            </article>
+            <article class="story" style="--sg1:#2D6A4F;--sg2:#1B4332">
+              <div class="story-av-wrap"><div class="avatar av-gold story-av">ว</div></div>
+              <span class="story-label">✅ Checklist B/L</span>
+            </article>
+            <article class="story" style="--sg1:#7C3AED;--sg2:#4C1D95">
+              <div class="story-av-wrap"><div class="avatar av-purple story-av">อ</div></div>
+              <span class="story-label">💡 ไอเดียใหม่</span>
+            </article>
+            <article class="story" style="--sg1:#B45309;--sg2:#78350F">
+              <div class="story-av-wrap"><div class="avatar av-amber story-av">น</div></div>
+              <span class="story-label">📅 ประชุม จ. 09:00</span>
+            </article>
+          </section>
+
+          <!-- Create post -->
+          <div class="create-post-card" id="create-post-card">
+            <div class="cp-top">
+              <div class="avatar av-navy" aria-hidden="true">รว</div>
+              <div class="cp-input-wrap">
+                <div class="cp-input"
+                     contenteditable="true"
+                     role="textbox"
+                     aria-label="เขียนโพสต์"
+                     aria-multiline="true"
+                     id="post-input"
+                     data-placeholder="คุณคิดอะไรอยู่ Ravee?"></div>
+              </div>
+            </div>
+            <div class="cp-bottom">
+              <button class="cp-action" aria-label="แนบรูปภาพ">
+                <i class="ti ti-photo" aria-hidden="true"></i><span>ภาพ</span>
+              </button>
+              <button class="cp-action" aria-label="แนบไฟล์">
+                <i class="ti ti-paperclip" aria-hidden="true"></i><span>ไฟล์</span>
+              </button>
+              <button class="cp-action" aria-label="ระดับความสำคัญ">
+                <i class="ti ti-alert-circle" aria-hidden="true"></i><span>ประกาศ</span>
+              </button>
+              <div class="cp-spacer"></div>
+              <button class="cp-post-btn" id="post-btn" aria-label="โพสต์">โพสต์</button>
+            </div>
+          </div>
+
+          <!-- Feed filter tabs -->
+          <div class="feed-filter" role="tablist">
+            <button class="ff-tab active" role="tab">ทั้งหมด</button>
+            <button class="ff-tab" role="tab">ประกาศ</button>
+            <button class="ff-tab" role="tab">C/O & Shipping</button>
+            <button class="ff-tab" role="tab">ไอเดีย</button>
+          </div>
+
+          <!-- Posts -->
+          <div id="posts-feed" aria-live="polite" aria-label="Feed โพสต์">
+
+            <article class="post-card" aria-label="โพสต์จากสมศรี">
+              <div class="post-header">
+                <div class="avatar av-red" aria-hidden="true">ส</div>
+                <div class="post-meta-info">
+                  <div class="post-author">สมศรี จันทร์ดี <span class="post-dept">แผนก C/O</span></div>
+                  <div class="post-time"><i class="ti ti-clock" aria-hidden="true"></i> วันนี้ 09:15 · <i class="ti ti-world" aria-hidden="true"></i> ทีม</div>
+                </div>
+                <button class="post-more-btn" aria-label="ตัวเลือกเพิ่มเติม"><i class="ti ti-dots" aria-hidden="true"></i></button>
+              </div>
+              <div class="post-body">
+                <span class="post-tag tag-urgent">🚨 ด่วนมาก</span>
+                <p><strong>กำหนดส่ง C/O ล็อต MDF-UAE รอบนี้ วันที่ 18 มิ.ย. เท่านั้น</strong></p>
+                <p>ขอให้ทุกคนเร่งดำเนินการและตรวจสอบเอกสารให้ครบก่อนส่ง หากมีปัญหาติดต่อได้โดยตรง 📋</p>
+              </div>
+              <div class="post-stats">
+                <div class="post-react-summary">
+                  <div class="react-icons">
+                    <span class="react-icon" style="background:#E41E3F" aria-hidden="true">❤️</span>
+                    <span class="react-icon" style="background:#2563EB" aria-hidden="true">👍</span>
+                  </div>
+                  <span>8 คนถูกใจ</span>
+                </div>
+                <span>5 ความคิดเห็น</span>
+              </div>
+              <div class="post-actions">
+                <button class="post-action-btn like-btn" aria-label="ถูกใจ">
+                  <i class="ti ti-thumb-up" aria-hidden="true"></i> ถูกใจ
+                </button>
+                <button class="post-action-btn" aria-label="แสดงความคิดเห็น">
+                  <i class="ti ti-message" aria-hidden="true"></i> ความคิดเห็น
+                </button>
+                <button class="post-action-btn" aria-label="แชร์">
+                  <i class="ti ti-share" aria-hidden="true"></i> แชร์
+                </button>
+              </div>
+            </article>
+
+            <article class="post-card" aria-label="โพสต์จากวิชัย">
+              <div class="post-header">
+                <div class="avatar av-gold" aria-hidden="true">ว</div>
+                <div class="post-meta-info">
+                  <div class="post-author">วิชัย สุขเจริญ <span class="post-dept">แผนก Shipping</span></div>
+                  <div class="post-time"><i class="ti ti-clock" aria-hidden="true"></i> เมื่อวาน 16:40 · <i class="ti ti-world" aria-hidden="true"></i> ทีม</div>
+                </div>
+                <button class="post-more-btn" aria-label="ตัวเลือกเพิ่มเติม"><i class="ti ti-dots" aria-hidden="true"></i></button>
+              </div>
+              <div class="post-body">
+                <span class="post-tag tag-sop">📄 SOP อัปเดต</span>
+                <p>อัปเดต <strong>ขั้นตอน L/C Confirmation</strong> กับธนาคารแล้วนะครับ มีการเปลี่ยนแปลงเล็กน้อยตรงส่วน Amendment</p>
+                <p>ดูไฟล์ได้ที่ <a class="post-link" href="#">SOP_LC_v2025_06.pdf</a> ใน Google Drive ของทีม</p>
+              </div>
+              <div class="post-attach">
+                <div class="post-attach-icon"><i class="ti ti-file-type-pdf" aria-hidden="true"></i></div>
+                <div class="post-attach-info">
+                  <div class="post-attach-name">SOP_LC_v2025_06.pdf</div>
+                  <div class="post-attach-meta">Google Drive · 240 KB</div>
+                </div>
+                <button class="post-attach-open" aria-label="เปิดไฟล์"><i class="ti ti-external-link" aria-hidden="true"></i></button>
+              </div>
+              <div class="post-stats">
+                <div class="post-react-summary">
+                  <div class="react-icons">
+                    <span class="react-icon" style="background:#2563EB" aria-hidden="true">👍</span>
+                  </div>
+                  <span>4 คนถูกใจ</span>
+                </div>
+                <span>2 ความคิดเห็น</span>
+              </div>
+              <div class="post-actions">
+                <button class="post-action-btn like-btn" aria-label="ถูกใจ">
+                  <i class="ti ti-thumb-up" aria-hidden="true"></i> ถูกใจ
+                </button>
+                <button class="post-action-btn" aria-label="แสดงความคิดเห็น">
+                  <i class="ti ti-message" aria-hidden="true"></i> ความคิดเห็น
+                </button>
+                <button class="post-action-btn" aria-label="แชร์">
+                  <i class="ti ti-share" aria-hidden="true"></i> แชร์
+                </button>
+              </div>
+            </article>
+
+            <article class="post-card" aria-label="โพสต์จากอรวรรณ">
+              <div class="post-header">
+                <div class="avatar av-purple" aria-hidden="true">อ</div>
+                <div class="post-meta-info">
+                  <div class="post-author">อรวรรณ ใจดี <span class="post-dept">IT & Systems</span></div>
+                  <div class="post-time"><i class="ti ti-clock" aria-hidden="true"></i> 2 วันที่แล้ว · <i class="ti ti-world" aria-hidden="true"></i> ทีม</div>
+                </div>
+                <button class="post-more-btn" aria-label="ตัวเลือกเพิ่มเติม"><i class="ti ti-dots" aria-hidden="true"></i></button>
+              </div>
+              <div class="post-body">
+                <span class="post-tag tag-idea">💡 ไอเดีย</span>
+                <p>เสนอทำ <strong>Dashboard ติดตาม Shipment Status</strong> แบบ real-time ให้ผู้จัดการดูได้ทุกวัน</p>
+                <p>เชื่อมกับ Google Sheet + Apps Script น่าจะทำได้ภายใน 1 สัปดาห์ ใครสนใจช่วยแจ้งได้เลยนะคะ 🙋‍♀️</p>
+              </div>
+              <div class="post-stats">
+                <div class="post-react-summary">
+                  <div class="react-icons">
+                    <span class="react-icon" style="background:#2563EB" aria-hidden="true">👍</span>
+                    <span class="react-icon" style="background:#7C3AED" aria-hidden="true">❤️</span>
+                  </div>
+                  <span>11 คนถูกใจ</span>
+                </div>
+                <span>7 ความคิดเห็น</span>
+              </div>
+              <div class="post-actions">
+                <button class="post-action-btn like-btn" aria-label="ถูกใจ">
+                  <i class="ti ti-thumb-up" aria-hidden="true"></i> ถูกใจ
+                </button>
+                <button class="post-action-btn" aria-label="แสดงความคิดเห็น">
+                  <i class="ti ti-message" aria-hidden="true"></i> ความคิดเห็น
+                </button>
+                <button class="post-action-btn" aria-label="แชร์">
+                  <i class="ti ti-share" aria-hidden="true"></i> แชร์
+                </button>
+              </div>
+            </article>
+
+          </div><!-- /posts-feed -->
+        </div><!-- /feed-col -->
+
+        <!-- RIGHT PANEL -->
+        <aside class="feed-right" aria-label="แถบข้อมูลด้านขวา">
+
+          <!-- Stats -->
+          <div class="widget-card">
+            <div class="wc-head">สรุปวันนี้</div>
+            <div class="stat-grid">
+              <div class="stat-cell">
+                <div class="stat-num urgent">2</div>
+                <div class="stat-label">งานด่วน</div>
+              </div>
+              <div class="stat-cell">
+                <div class="stat-num">7</div>
+                <div class="stat-label">C/O รอดำเนิน</div>
+              </div>
+              <div class="stat-cell">
+                <div class="stat-num">23</div>
+                <div class="stat-label">Shipment</div>
+              </div>
+              <div class="stat-cell">
+                <div class="stat-num gold">฿142K</div>
+                <div class="stat-label">Invoice ค้าง</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Online members -->
+          <div class="widget-card">
+            <div class="wc-head">ออนไลน์ <span class="wc-count">6</span></div>
+            <ul class="online-list" aria-label="สมาชิกที่ออนไลน์">
+              <li class="online-item">
+                <div class="ol-wrap"><div class="avatar av-navy sm" aria-hidden="true">รว</div><span class="ol-dot" style="background:#22C55E"></span></div>
+                <div class="ol-info"><div class="ol-name">Ravee Digital Space</div><div class="ol-status">กำลังใช้งาน</div></div>
+              </li>
+              <li class="online-item">
+                <div class="ol-wrap"><div class="avatar av-red sm" aria-hidden="true">ส</div><span class="ol-dot" style="background:#22C55E"></span></div>
+                <div class="ol-info"><div class="ol-name">สมศรี จันทร์ดี</div><div class="ol-status">5 นาทีที่แล้ว</div></div>
+              </li>
+              <li class="online-item">
+                <div class="ol-wrap"><div class="avatar av-gold sm" aria-hidden="true">ว</div><span class="ol-dot" style="background:#FCD34D"></span></div>
+                <div class="ol-info"><div class="ol-name">วิชัย สุขเจริญ</div><div class="ol-status">ไม่อยู่ที่โต๊ะ</div></div>
+              </li>
+              <li class="online-item">
+                <div class="ol-wrap"><div class="avatar av-purple sm" aria-hidden="true">อ</div><span class="ol-dot" style="background:#22C55E"></span></div>
+                <div class="ol-info"><div class="ol-name">อรวรรณ ใจดี</div><div class="ol-status">กำลังใช้งาน</div></div>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Upcoming -->
+          <div class="widget-card">
+            <div class="wc-head">กำหนดการใกล้นี้ <a class="wc-link" href="#" aria-label="ดูปฏิทินทั้งหมด">ดูทั้งหมด</a></div>
+            <ul class="event-list" aria-label="กำหนดการ">
+              <li class="event-item event-urgent">
+                <div class="event-date-box"><span class="event-day">18</span><span class="event-mon">มิ.ย.</span></div>
+                <div class="event-body"><div class="event-title">ส่ง C/O ล็อต MDF-UAE</div><div class="event-sub">🚨 ครบกำหนด</div></div>
+              </li>
+              <li class="event-item event-warn">
+                <div class="event-date-box" style="background:#FEF3CD;color:#92400E"><span class="event-day">22</span><span class="event-mon">มิ.ย.</span></div>
+                <div class="event-body"><div class="event-title">L/C หมดอายุ MY-PB-062</div><div class="event-sub">ติดต่อธนาคารก่อน</div></div>
+              </li>
+              <li class="event-item">
+                <div class="event-date-box" style="background:#EAF3DE;color:#2D6A4F"><span class="event-day">23</span><span class="event-mon">มิ.ย.</span></div>
+                <div class="event-body"><div class="event-title">ประชุมทีม Export</div><div class="event-sub">จันทร์ 09:00 · ห้อง A</div></div>
+              </li>
+            </ul>
+          </div>
+
+        </aside>
+      </div>
+    </div>
+
+    <!-- PAGE: BOARD -->
+    <div class="page" id="page-board">
+      <div class="page-header">
+        <h1 class="page-title"><i class="ti ti-speakerphone" aria-hidden="true"></i> กระดานข่าว</h1>
+        <button class="btn-primary"><i class="ti ti-plus" aria-hidden="true"></i> โพสต์ประกาศ</button>
+      </div>
+      <div class="board-filters">
+        <button class="ff-tab active">ทั้งหมด</button>
+        <button class="ff-tab tag-urgent-btn">🚨 ด่วน</button>
+        <button class="ff-tab">📄 SOP</button>
+        <button class="ff-tab">📅 ประชุม</button>
+        <button class="ff-tab">💡 ไอเดีย</button>
+      </div>
+      <div class="board-list">
+        <article class="board-item board-urgent">
+          <div class="board-left"><div class="board-pri-bar"></div></div>
+          <div class="board-content">
+            <div class="board-top"><span class="post-tag tag-urgent">🚨 ด่วนมาก</span><span class="board-time">วันนี้ 09:15</span></div>
+            <div class="board-title">กำหนดส่ง C/O ล็อต MDF-UAE รอบนี้ วันที่ 18 มิ.ย.</div>
+            <div class="board-author"><div class="avatar av-red xs">ส</div> สมศรี จันทร์ดี</div>
+          </div>
+          <div class="board-right"><button class="board-pin-btn" aria-label="ปักหมุด"><i class="ti ti-pin" aria-hidden="true"></i></button></div>
+        </article>
+        <article class="board-item board-urgent">
+          <div class="board-left"><div class="board-pri-bar"></div></div>
+          <div class="board-content">
+            <div class="board-top"><span class="post-tag tag-urgent">🚨 ด่วนมาก</span><span class="board-time">วันนี้ 11:30</span></div>
+            <div class="board-title">L/C ล็อต MY-PB-062 หมดอายุ 22 มิ.ย. — ติดต่อธนาคารด่วน</div>
+            <div class="board-author"><div class="avatar av-gold xs">ว</div> วิชัย สุขเจริญ</div>
+          </div>
+          <div class="board-right"><button class="board-pin-btn" aria-label="ปักหมุด"><i class="ti ti-pin" aria-hidden="true"></i></button></div>
+        </article>
+        <article class="board-item">
+          <div class="board-left"><div class="board-pri-bar" style="background:#1D4ED8"></div></div>
+          <div class="board-content">
+            <div class="board-top"><span class="post-tag tag-sop">📄 SOP อัปเดต</span><span class="board-time">เมื่อวาน 16:40</span></div>
+            <div class="board-title">อัปเดต SOP การยื่น e-Form กรมศุลกากร รอบใหม่พร้อมดาวน์โหลดแล้ว</div>
+            <div class="board-author"><div class="avatar av-navy xs">ผ</div> ผู้จัดการ</div>
+          </div>
+          <div class="board-right"><button class="board-pin-btn" aria-label="ปักหมุด"><i class="ti ti-pin" aria-hidden="true"></i></button></div>
+        </article>
+        <article class="board-item">
+          <div class="board-left"><div class="board-pri-bar" style="background:#B45309"></div></div>
+          <div class="board-content">
+            <div class="board-top"><span class="post-tag tag-info">📅 ทั่วไป</span><span class="board-time">2 วันที่แล้ว</span></div>
+            <div class="board-title">ประชุมทีม Export เปลี่ยนเป็นทุกจันทร์ 09:00 น. เริ่มสัปดาห์หน้า</div>
+            <div class="board-author"><div class="avatar av-slate xs">H</div> HR</div>
+          </div>
+          <div class="board-right"><button class="board-pin-btn" aria-label="ปักหมุด"><i class="ti ti-pin" aria-hidden="true"></i></button></div>
+        </article>
+      </div>
+    </div>
+
+    <!-- PAGE: MY SPACE -->
+    <div class="page" id="page-myspace">
+      <div class="profile-hero">
+        <div class="profile-cover" aria-hidden="true"></div>
+        <div class="profile-info-row">
+          <div class="profile-avatar av-navy">รว</div>
+          <div class="profile-details">
+            <h1 class="profile-name">Ravee Digital Space</h1>
+            <div class="profile-role">Export & Logistics · Admin · ravee@company.com</div>
+          </div>
+          <button class="btn-primary profile-edit-btn"><i class="ti ti-edit" aria-hidden="true"></i> แก้ไขโปรไฟล์</button>
+        </div>
+        <div class="profile-tabs" role="tablist">
+          <button class="profile-tab active" role="tab">โพสต์</button>
+          <button class="profile-tab" role="tab">เกี่ยวกับฉัน</button>
+          <button class="profile-tab" role="tab">ไฟล์ที่แชร์</button>
+        </div>
+      </div>
+      <div class="profile-body">
+        <div class="profile-col-left">
+          <div class="widget-card">
+            <div class="wc-head">เกี่ยวกับฉัน</div>
+            <ul class="about-list">
+              <li><i class="ti ti-building" aria-hidden="true"></i> แผนก Export & Logistics</li>
+              <li><i class="ti ti-briefcase" aria-hidden="true"></i> System Admin & C/O Coordinator</li>
+              <li><i class="ti ti-mail" aria-hidden="true"></i> ravee@company.co.th</li>
+              <li><i class="ti ti-calendar-plus" aria-hidden="true"></i> เข้าร่วมมกราคม 2024</li>
+            </ul>
+          </div>
+          <div class="widget-card">
+            <div class="wc-head">ผลงานเดือนนี้</div>
+            <div class="stat-grid">
+              <div class="stat-cell"><div class="stat-num">12</div><div class="stat-label">C/O ที่จัดการ</div></div>
+              <div class="stat-cell"><div class="stat-num">3</div><div class="stat-label">โปรเจกต์</div></div>
+              <div class="stat-cell"><div class="stat-num">28</div><div class="stat-label">โพสต์</div></div>
+              <div class="stat-cell"><div class="stat-num">94%</div><div class="stat-label">On-time</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="profile-col-right">
+          <div class="post-card">
+            <div class="post-header">
+              <div class="avatar av-navy" aria-hidden="true">รว</div>
+              <div class="post-meta-info">
+                <div class="post-author">Ravee Digital Space</div>
+                <div class="post-time">วันนี้ 08:00</div>
+              </div>
+            </div>
+            <div class="post-body"><p>เริ่มสัปดาห์ใหม่! เตรียม C/O ล็อต UAE ให้พร้อมก่อน 18 มิ.ย. 🚀</p></div>
+            <div class="post-actions">
+              <button class="post-action-btn like-btn"><i class="ti ti-thumb-up" aria-hidden="true"></i> ถูกใจ</button>
+              <button class="post-action-btn"><i class="ti ti-message" aria-hidden="true"></i> ความคิดเห็น</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: CALENDAR -->
+    <div class="page" id="page-calendar">
+      <div class="page-header">
+        <h1 class="page-title"><i class="ti ti-calendar" aria-hidden="true"></i> ปฏิทินทีม</h1>
+        <button class="btn-primary"><i class="ti ti-plus" aria-hidden="true"></i> เพิ่มกำหนดการ</button>
+      </div>
+      <div class="cal-wrap">
+        <div class="cal-header">
+          <button class="cal-nav" aria-label="เดือนก่อนหน้า"><i class="ti ti-chevron-left" aria-hidden="true"></i></button>
+          <h2 class="cal-month" id="cal-month-label">มิถุนายน 2026</h2>
+          <button class="cal-nav" aria-label="เดือนถัดไป"><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
+        </div>
+        <div class="cal-grid">
+          <div class="cal-day-label">อา</div><div class="cal-day-label">จ</div>
+          <div class="cal-day-label">อ</div><div class="cal-day-label">พ</div>
+          <div class="cal-day-label">พฤ</div><div class="cal-day-label">ศ</div>
+          <div class="cal-day-label">ส</div>
+          <!-- Jun 2026 starts Monday -->
+          <div class="cal-day empty"></div>
+          <div class="cal-day">1</div><div class="cal-day">2</div><div class="cal-day">3</div><div class="cal-day">4</div><div class="cal-day">5</div><div class="cal-day">6</div>
+          <div class="cal-day">7</div><div class="cal-day">8</div><div class="cal-day">9</div><div class="cal-day meet">10<span class="cal-event">ประชุม</span></div><div class="cal-day">11</div><div class="cal-day">12</div><div class="cal-day">13</div>
+          <div class="cal-day">14</div><div class="cal-day today">15</div><div class="cal-day">16</div><div class="cal-day">17</div><div class="cal-day urgent-day">18<span class="cal-event urgent-ev">C/O UAE</span></div><div class="cal-day">19</div><div class="cal-day">20</div>
+          <div class="cal-day meet">21<span class="cal-event">ประชุม</span></div><div class="cal-day urgent-day">22<span class="cal-event urgent-ev">L/C หมด</span></div><div class="cal-day meet">23<span class="cal-event">ประชุม</span></div><div class="cal-day">24</div><div class="cal-day">25</div><div class="cal-day">26</div><div class="cal-day">27</div>
+          <div class="cal-day meet">28<span class="cal-event">ประชุม</span></div><div class="cal-day">29</div><div class="cal-day">30</div>
+        </div>
+        <div class="cal-legend">
+          <span class="leg-item"><span class="leg-dot" style="background:#EF4444"></span>กำหนดด่วน</span>
+          <span class="leg-item"><span class="leg-dot" style="background:#2563EB"></span>ประชุม</span>
+          <span class="leg-item"><span class="leg-dot today-dot"></span>วันนี้</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: SETTINGS -->
+    <div class="page" id="page-settings">
+      <div class="page-header">
+        <h1 class="page-title"><i class="ti ti-settings" aria-hidden="true"></i> ตั้งค่า</h1>
+      </div>
+      <div class="settings-layout">
+        <nav class="settings-nav" aria-label="หมวดการตั้งค่า">
+          <button class="sn-item active" data-stab="display"><i class="ti ti-palette" aria-hidden="true"></i> การแสดงผล</button>
+          <button class="sn-item" data-stab="profile"><i class="ti ti-user" aria-hidden="true"></i> โปรไฟล์</button>
+          <button class="sn-item" data-stab="notif"><i class="ti ti-bell" aria-hidden="true"></i> แจ้งเตือน</button>
+          <button class="sn-item" data-stab="links"><i class="ti ti-link" aria-hidden="true"></i> จัดการลิงก์</button>
+          <button class="sn-item" data-stab="privacy"><i class="ti ti-lock" aria-hidden="true"></i> ความเป็นส่วนตัว</button>
+        </nav>
+        <div class="settings-body">
+
+          <!-- DISPLAY TAB -->
+          <div class="stab active" id="stab-display">
+            <h2 class="stab-title">การแสดงผล</h2>
+
+            <div class="setting-group">
+              <div class="setting-group-title">ธีม</div>
+              <div class="theme-options">
+                <label class="theme-opt" aria-label="ธีมสว่าง">
+                  <input type="radio" name="theme" value="light" checked>
+                  <div class="theme-preview theme-light-prev"><span>Aa</span></div>
+                  <span>Light</span>
+                </label>
+                <label class="theme-opt" aria-label="ธีมมืด">
+                  <input type="radio" name="theme" value="dark">
+                  <div class="theme-preview theme-dark-prev"><span>Aa</span></div>
+                  <span>Dark</span>
+                </label>
+                <label class="theme-opt" aria-label="ธีม Navy">
+                  <input type="radio" name="theme" value="navy">
+                  <div class="theme-preview theme-navy-prev"><span>Aa</span></div>
+                  <span>Navy</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="setting-group">
+              <div class="setting-group-title">สีหลัก (Accent)</div>
+              <div class="accent-options">
+                <button class="accent-swatch active" style="background:#1D4E8F" data-accent="blue" aria-label="สีน้ำเงิน"></button>
+                <button class="accent-swatch" style="background:#2D6A4F" data-accent="green" aria-label="สีเขียว"></button>
+                <button class="accent-swatch" style="background:#7C3AED" data-accent="purple" aria-label="สีม่วง"></button>
+                <button class="accent-swatch" style="background:#B45309" data-accent="amber" aria-label="สีเหลือง"></button>
+                <button class="accent-swatch" style="background:#B91C1C" data-accent="red" aria-label="สีแดง"></button>
+                <button class="accent-swatch" style="background:#0F766E" data-accent="teal" aria-label="สีเทียล"></button>
+              </div>
+            </div>
+
+            <div class="setting-group">
+              <div class="setting-group-title">ขนาดตัวอักษร</div>
+              <div class="font-size-row">
+                <span class="fs-label small">ก</span>
+                <input type="range" min="13" max="18" value="15" class="fs-slider" id="font-size-slider" aria-label="ขนาดตัวอักษร">
+                <span class="fs-label large">ก</span>
+                <span class="fs-value" id="fs-value-label">15px</span>
+              </div>
+            </div>
+
+            <div class="setting-group">
+              <div class="setting-group-title">ฟอนต์</div>
+              <div class="font-options">
+                <label class="font-opt">
+                  <input type="radio" name="font" value="ibm" checked>
+                  <span style="font-family:'IBM Plex Sans Thai',sans-serif">IBM Plex Sans Thai — ภาษาไทยอ่านง่าย</span>
+                </label>
+                <label class="font-opt">
+                  <input type="radio" name="font" value="sarabun">
+                  <span style="font-family:'Sarabun',sans-serif">Sarabun — ทางการสวยงาม</span>
+                </label>
+                <label class="font-opt">
+                  <input type="radio" name="font" value="system">
+                  <span style="font-family:system-ui,sans-serif">System Default — เร็วที่สุด</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="setting-group">
+              <div class="setting-group-title">ความหนาแน่นของ Feed</div>
+              <div class="density-options">
+                <label class="font-opt"><input type="radio" name="density" value="compact"> Compact — โพสต์ชิดกัน</label>
+                <label class="font-opt"><input type="radio" name="density" value="normal" checked> Normal — มาตรฐาน</label>
+                <label class="font-opt"><input type="radio" name="density" value="spacious"> Spacious — ระยะห่างมาก</label>
+              </div>
+            </div>
+
+            <button class="btn-primary save-btn" id="save-display-btn">บันทึกการตั้งค่า</button>
+          </div>
+
+          <!-- LINKS TAB -->
+          <div class="stab" id="stab-links">
+            <h2 class="stab-title">จัดการลิงก์ด่วน</h2>
+            <div class="links-manager" id="links-manager">
+              <div class="lm-item">
+                <div class="sb-link-icon" style="background:#EAF3DE"><i class="ti ti-file-certificate" style="color:#2D6A4F" aria-hidden="true"></i></div>
+                <div class="lm-info"><div class="lm-name">Origin Desk</div><div class="lm-url">https://script.google.com/…</div></div>
+                <button class="lm-del" aria-label="ลบ Origin Desk"><i class="ti ti-trash" aria-hidden="true"></i></button>
+              </div>
+              <div class="lm-item">
+                <div class="sb-link-icon" style="background:#DBEAFE"><i class="ti ti-forms" style="color:#1D4ED8" aria-hidden="true"></i></div>
+                <div class="lm-info"><div class="lm-name">e-Form ศุลกากร</div><div class="lm-url">https://efiling.customs.go.th</div></div>
+                <button class="lm-del" aria-label="ลบ e-Form ศุลกากร"><i class="ti ti-trash" aria-hidden="true"></i></button>
+              </div>
+              <div class="lm-item">
+                <div class="sb-link-icon" style="background:#FDF3DC"><i class="ti ti-building-bank" style="color:#C8972B" aria-hidden="true"></i></div>
+                <div class="lm-info"><div class="lm-name">KBank L/C Portal</div><div class="lm-url">https://kasikornbank.com/…</div></div>
+                <button class="lm-del" aria-label="ลบ KBank L/C Portal"><i class="ti ti-trash" aria-hidden="true"></i></button>
+              </div>
+            </div>
+            <div class="add-link-form" id="add-link-form">
+              <h3 class="form-subtitle">เพิ่มลิงก์ใหม่</h3>
+              <div class="form-row">
+                <label class="form-label" for="lf-name">ชื่อลิงก์</label>
+                <input class="form-input" id="lf-name" type="text" placeholder="เช่น Freight Tracker">
+              </div>
+              <div class="form-row">
+                <label class="form-label" for="lf-url">URL</label>
+                <input class="form-input" id="lf-url" type="url" placeholder="https://...">
+              </div>
+              <div class="form-row">
+                <label class="form-label" for="lf-icon">ประเภท</label>
+                <select class="form-input" id="lf-icon">
+                  <option value="green">📄 เอกสาร</option>
+                  <option value="blue">🔗 ระบบ / Portal</option>
+                  <option value="gold">🏦 ธนาคาร</option>
+                  <option value="purple">🚢 Logistics</option>
+                  <option value="slate">⚙️ อื่น ๆ</option>
+                </select>
+              </div>
+              <button class="btn-primary" id="confirm-add-link"><i class="ti ti-plus" aria-hidden="true"></i> เพิ่มลิงก์</button>
+            </div>
+          </div>
+
+          <!-- PROFILE TAB -->
+          <div class="stab" id="stab-profile">
+            <h2 class="stab-title">โปรไฟล์ของฉัน</h2>
+            <div class="form-row"><label class="form-label" for="pf-name">ชื่อ-นามสกุล</label><input class="form-input" id="pf-name" value="Ravee Digital Space"></div>
+            <div class="form-row"><label class="form-label" for="pf-dept">แผนก</label><input class="form-input" id="pf-dept" value="Export & Logistics"></div>
+            <div class="form-row"><label class="form-label" for="pf-role">ตำแหน่ง</label><input class="form-input" id="pf-role" value="Admin & C/O Coordinator"></div>
+            <div class="form-row"><label class="form-label" for="pf-email">อีเมลบริษัท</label><input class="form-input" id="pf-email" type="email" value="ravee@company.co.th" readonly style="opacity:.6"></div>
+            <button class="btn-primary save-btn">บันทึกโปรไฟล์</button>
+          </div>
+
+          <!-- NOTIFICATIONS TAB -->
+          <div class="stab" id="stab-notif">
+            <h2 class="stab-title">การแจ้งเตือน</h2>
+            <div class="notif-setting"><div class="ns-info"><div class="ns-label">โพสต์ใหม่ใน Feed</div><div class="ns-sub">แจ้งเตือนเมื่อมีโพสต์ใหม่</div></div><label class="toggle"><input type="checkbox" checked><span class="toggle-track"></span></label></div>
+            <div class="notif-setting"><div class="ns-info"><div class="ns-label">ประกาศด่วน</div><div class="ns-sub">แจ้งเตือนทันทีเมื่อมีข่าวด่วน</div></div><label class="toggle"><input type="checkbox" checked><span class="toggle-track"></span></label></div>
+            <div class="notif-setting"><div class="ns-info"><div class="ns-label">กำหนดการล่วงหน้า</div><div class="ns-sub">แจ้งเตือน 1 วันก่อนถึงกำหนด</div></div><label class="toggle"><input type="checkbox" checked><span class="toggle-track"></span></label></div>
+            <div class="notif-setting"><div class="ns-info"><div class="ns-label">มีคนถูกใจโพสต์ของฉัน</div><div class="ns-sub"></div></div><label class="toggle"><input type="checkbox"><span class="toggle-track"></span></label></div>
+          </div>
+
+          <!-- PRIVACY TAB -->
+          <div class="stab" id="stab-privacy">
+            <h2 class="stab-title">ความเป็นส่วนตัว</h2>
+            <div class="privacy-note"><i class="ti ti-lock" aria-hidden="true"></i> ExportSpace ใช้งานได้เฉพาะ <strong>อีเมลบริษัท (@company.co.th)</strong> เท่านั้น ข้อมูลทั้งหมดเก็บใน Google Sheets ขององค์กร</div>
+            <div class="notif-setting"><div class="ns-info"><div class="ns-label">แสดงสถานะออนไลน์</div></div><label class="toggle"><input type="checkbox" checked><span class="toggle-track"></span></label></div>
+            <div class="notif-setting"><div class="ns-info"><div class="ns-label">อนุญาตให้ค้นหาชื่อฉัน</div></div><label class="toggle"><input type="checkbox" checked><span class="toggle-track"></span></label></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ADD LINK MODAL -->
+<div class="modal-overlay" id="link-modal" aria-modal="true" role="dialog" aria-label="เพิ่มลิงก์ด่วน">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 class="modal-title">เพิ่มลิงก์ด่วน</h2>
+      <button class="modal-close" id="modal-close" aria-label="ปิด"><i class="ti ti-x" aria-hidden="true"></i></button>
+    </div>
+    <div class="form-row"><label class="form-label" for="ml-name">ชื่อลิงก์</label><input class="form-input" id="ml-name" type="text" placeholder="เช่น Freight Tracker"></div>
+    <div class="form-row"><label class="form-label" for="ml-url">URL</label><input class="form-input" id="ml-url" type="url" placeholder="https://..."></div>
+    <div class="form-row"><label class="form-label" for="ml-type">ประเภท</label>
+      <select class="form-input" id="ml-type">
+        <option value="green">📄 เอกสาร</option>
+        <option value="blue">🔗 ระบบ / Portal</option>
+        <option value="gold">🏦 ธนาคาร</option>
+        <option value="purple">🚢 Logistics</option>
+        <option value="slate">⚙️ อื่น ๆ</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="modal-cancel">ยกเลิก</button>
+      <button class="btn-primary" id="modal-confirm"><i class="ti ti-plus" aria-hidden="true"></i> เพิ่ม</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="app.js"></script>
+</body>
+</html>
