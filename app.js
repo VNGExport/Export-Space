@@ -269,17 +269,27 @@ function renderOnlineUsers(users) {
 }
 
 function renderUpcomingEvents(events) {
+  state.allEvents = events || [];
   const widget = document.getElementById('event-list');
-  if (!widget) return;
+  if (!widget) { renderCalendar(); return; }
+
   if (!events || events.length === 0) {
-    widget.innerHTML = '<li style="font-size:13px;color:var(--text-tertiary);padding:8px 16px">ยังไม่มีกำหนดการ</li>';
+    widget.innerHTML = '<li class="event-item" style="padding:12px 16px;color:var(--text-tertiary);font-size:13px;list-style:none">ยังไม่มีกำหนดการ — เพิ่มได้ที่หน้าปฏิทิน</li>';
     renderCalendar(); return;
   }
+
+  // แสดงทั้งที่ผ่านมาแล้วและกำลังจะมา (7 วันที่แล้ว ถึง อนาคต)
+  const today = new Date(); today.setHours(0,0,0,0);
+  const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7);
+
   const upcoming = [...events]
-    .filter(e => new Date(e.date) >= new Date(new Date().toDateString()))
-    .sort((a,b) => new Date(a.date) - new Date(b.date)).slice(0,4);
-  widget.innerHTML = upcoming.length ? upcoming.map(ev => eventLI(ev)).join('') :
-    '<li style="font-size:13px;color:var(--text-tertiary);padding:8px 16px">ไม่มีกำหนดการที่ใกล้จะมาถึง</li>';
+    .filter(e => { const d = new Date(e.date); return d >= weekAgo; })
+    .sort((a,b) => new Date(a.date) - new Date(b.date))
+    .slice(0, 5);
+
+  widget.innerHTML = upcoming.length
+    ? upcoming.map(ev => eventLI(ev)).join('')
+    : '<li class="event-item" style="padding:12px 16px;color:var(--text-tertiary);font-size:13px;list-style:none">ไม่มีกำหนดการ 7 วันนี้</li>';
   renderCalendar();
 }
 
@@ -352,26 +362,8 @@ async function loadOnlineUsers() {
 
 /* ── EVENTS (widget + calendar) ── */
 async function loadUpcomingEvents() {
-  const widget = document.getElementById('event-list');
-  const events = await api({ action:'get', sheet:'Events' });
-  state.allEvents = events || [];
-
-  if (!widget) return;
-  if (!events || events.length === 0) {
-    widget.innerHTML = `<li style="font-size:13px;color:var(--text-tertiary);padding:8px 16px">ยังไม่มีกำหนดการ</li>`;
-    renderCalendar();
-    return;
-  }
-
-  const upcoming = [...events]
-    .filter(e => new Date(e.date) >= new Date(new Date().toDateString()))
-    .sort((a,b) => new Date(a.date) - new Date(b.date))
-    .slice(0, 4);
-
-  widget.innerHTML = upcoming.length ? upcoming.map(ev => eventLI(ev)).join('') :
-    `<li style="font-size:13px;color:var(--text-tertiary);padding:8px 16px">ไม่มีกำหนดการที่ใกล้จะมาถึง</li>`;
-
-  renderCalendar();
+  const events = await apiCached('Events');
+  renderUpcomingEvents(events);
 }
 
 function eventLI(ev) {
@@ -432,7 +424,7 @@ async function loadBoard() {
   list.querySelectorAll('.board-del-btn').forEach(b => b.addEventListener('click', async () => {
     if (!confirm('ลบประกาศนี้?')) return;
     await api({ action:'delete', sheet:'Board', id: b.dataset.id });
-    showToast('ลบประกาศแล้ว'); loadBoard();
+    invalidateCache('Board'); showToast('ลบประกาศแล้ว ✓'); loadBoard();
   }));
 
   // badge
@@ -470,7 +462,7 @@ function postCard(p) {
   const tagCls = tagMap[p.tag] || 'tag-info';
   const showTag = p.tag && p.tag !== 'ทั่วไป';
 
-  return `<article class="post-card" data-post-id="${esc(p.id)}">
+  return `<article class="post-card" data-post-id="${esc(p.id)}" data-likes="${likes}">
     <div class="post-header">
       <div class="avatar" style="background:${col}" aria-hidden="true">${esc(ini)}</div>
       <div class="post-meta-info">
@@ -612,8 +604,21 @@ async function onLike(e) {
   const btn    = e.currentTarget;
   const postId = btn.dataset.postId;
   const liked  = btn.classList.toggle('liked');
+
+  // อัปเดต UI ทันที
+  const card   = btn.closest('.post-card');
+  const summary = card?.querySelector('.post-react-summary');
+  if (summary) {
+    const cur = parseInt(card.dataset.likes||'0') + (liked ? 1 : -1);
+    card.dataset.likes = Math.max(0, cur);
+    summary.innerHTML = cur > 0
+      ? `<div class="react-icons"><span class="react-icon" style="background:#2563EB">👍</span></div><span>${cur} คน</span>`
+      : `<span style="color:var(--text-tertiary);font-size:13px">ยังไม่มีปฏิกิริยา</span>`;
+  }
+
   if (liked && postId && !postId.startsWith('tmp-')) {
     await api({ action:'like', id:postId });
+    invalidateCache('Posts');
   }
   showToast(liked ? '👍 ถูกใจแล้ว' : 'เอาถูกใจออก');
 }
@@ -644,8 +649,8 @@ function onPostMenu(e) {
   document.body.appendChild(menu);
 
   menu.querySelector('.ctx-delete')?.addEventListener('click', async () => {
-    if (id && !id.startsWith('tmp-')) await api({ action:'delete', sheet:'Posts', id });
-    card?.remove(); menu.remove(); showToast('ลบโพสต์แล้ว');
+    if (id && !id.startsWith('tmp-')) { await api({ action:'delete', sheet:'Posts', id }); invalidateCache('Posts'); }
+    card?.remove(); menu.remove(); showToast('ลบโพสต์แล้ว ✓');
   });
   menu.querySelector('.ctx-copy')?.addEventListener('click', () => {
     navigator.clipboard.writeText(card?.querySelector('.post-body p')?.innerText||'');
@@ -779,7 +784,7 @@ function bindAll() {
     await api({ action:'create', sheet:'Events', title, date, description:desc, priority:pri });
     document.getElementById('ev-title').value='';
     document.getElementById('cal-add-form').style.display='none';
-    showToast('เพิ่มกำหนดการแล้ว ✓');
+    invalidateCache('Events'); showToast('เพิ่มกำหนดการแล้ว ✓');
     await loadUpcomingEvents();
   });
 
