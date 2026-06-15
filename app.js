@@ -599,7 +599,17 @@ async function submitPost() {
   const btn  = document.getElementById('post-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'กำลังโพสต์…'; }
 
-  const saved = await api({ action:'create', sheet:'Posts', author:user.name, dept:user.dept||'', content:text, tag, likes:0 });
+  // อัปโหลดไฟล์แนบไปยัง Google Drive ก่อน
+  let imageUrl = '', fileName = '', viewUrls = '';
+  if (pendingAttachments.length) {
+    if (btn) btn.textContent = 'กำลังอัปโหลดไฟล์…';
+    const uploaded = await uploadFilesToDrive();
+    imageUrl = uploaded.imageUrl || '';
+    fileName = uploaded.fileName || '';
+    viewUrls = uploaded.viewUrls || '';
+  }
+
+  const saved = await api({ action:'create', sheet:'Posts', author:user.name, dept:user.dept||'', content:text, tag, likes:0, image_url:imageUrl, file_name:fileName });
 
   const feed  = document.getElementById('posts-feed');
   feed?.querySelector('.empty-state, .loading-state')?.remove();
@@ -616,6 +626,11 @@ async function submitPost() {
   feed?.insertBefore(card, feed.firstChild);
 
   input.innerText = '';
+  // clear attachments
+  pendingAttachments.forEach(a => { if (a.localUrl) URL.revokeObjectURL(a.localUrl); });
+  pendingAttachments = [];
+  const prevWrap = document.getElementById('attach-preview-wrap');
+  if (prevWrap) prevWrap.innerHTML = '';
   if (btn) { btn.disabled = false; btn.textContent = 'โพสต์'; }
   invalidateCache('Posts');
   if (saved && typeof signalNewPost === 'function') signalNewPost(user.name);
@@ -713,45 +728,114 @@ function onShare(e) {
 /* ════════════════════════════════════════════
    IMAGE / FILE ATTACH
 ════════════════════════════════════════════ */
+/* ── pending attachments ก่อนโพสต์ ── */
+let pendingAttachments = []; // [{ file, type, thumbUrl, viewUrl, fileName }]
+
 function bindAttachButtons() {
   const imgBtn  = document.querySelector('.cp-action[aria-label="แนบรูปภาพ"]');
   const fileBtn = document.querySelector('.cp-action[aria-label="แนบไฟล์"]');
 
-  // สร้าง hidden input ครั้งเดียว
   if (!document.getElementById('img-picker')) {
     const img = document.createElement('input');
-    img.type='file'; img.id='img-picker'; img.accept='image/*';
-    img.style.cssText='position:absolute;left:-9999px';
-    img.onchange = e => attachPreview(e.target.files[0], 'image');
+    img.type='file'; img.id='img-picker'; img.accept='image/*,video/*';
+    img.style.cssText='position:absolute;left:-9999px'; img.multiple=true;
+    img.onchange = e => { [...e.target.files].forEach(f => queueAttach(f, 'image')); img.value=''; };
     document.body.appendChild(img);
   }
   if (!document.getElementById('file-picker')) {
-    const f = document.createElement('input');
-    f.type='file'; f.id='file-picker';
-    f.accept='.pdf,.doc,.docx,.xlsx,.csv,.txt';
-    f.style.cssText='position:absolute;left:-9999px';
-    f.onchange = e => attachPreview(e.target.files[0], 'file');
-    document.body.appendChild(f);
+    const fp = document.createElement('input');
+    fp.type='file'; fp.id='file-picker'; fp.multiple=true;
+    fp.accept='.pdf,.doc,.docx,.xlsx,.csv,.txt,.zip';
+    fp.style.cssText='position:absolute;left:-9999px';
+    fp.onchange = e => { [...e.target.files].forEach(f => queueAttach(f, 'file')); fp.value=''; };
+    document.body.appendChild(fp);
   }
 
   imgBtn?.addEventListener('click', () => document.getElementById('img-picker')?.click());
   fileBtn?.addEventListener('click', () => document.getElementById('file-picker')?.click());
 }
 
-function attachPreview(file, type) {
+/* แสดง preview ใต้ช่องโพสต์ก่อนส่ง */
+function queueAttach(file, type) {
   if (!file) return;
-  const postInput = document.getElementById('post-input');
-  if (!postInput) return;
+  const isImg = type === 'image' && file.type.startsWith('image/');
+  const localUrl = isImg ? URL.createObjectURL(file) : null;
+  pendingAttachments.push({ file, type, localUrl, fileName: file.name, mimeType: file.type });
+  renderAttachPreviews();
+  showToast(`เพิ่ม ${file.name} แล้ว — จะอัปโหลดเมื่อกด โพสต์`);
+}
 
-  // เพิ่มชื่อไฟล์ใน input text
-  const cur  = postInput.innerText === (postInput.dataset.placeholder||'') ? '' : postInput.innerText;
-  const tag  = type === 'image' ? `📷 ${file.name}` : `📎 ${file.name}`;
-  postInput.innerText = cur ? `${cur}\n${tag}` : tag;
-  postInput.focus();
-  showToast(`แนบ ${file.name} แล้ว (อยู่ในข้อความ)`);
+function renderAttachPreviews() {
+  let wrap = document.getElementById('attach-preview-wrap');
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.id = 'attach-preview-wrap';
+    wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;padding:8px 16px 0;';
+    document.getElementById('create-post-card')?.appendChild(wrap);
+  }
+  wrap.innerHTML = pendingAttachments.map((a, i) => `
+    <div style="position:relative;display:inline-block">
+      ${a.localUrl
+        ? `<img src="${a.localUrl}" alt="${escHtml(a.fileName)}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">`
+        : `<div style="width:80px;height:80px;border-radius:8px;border:1px solid var(--border);background:var(--bg-subtle);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;color:var(--text-secondary);padding:4px;text-align:center">
+            <i class="ti ti-file" style="font-size:20px;margin-bottom:2px"></i>${escHtml(a.fileName.slice(0,12))}
+          </div>`}
+      <button onclick="removeAttach(${i})" aria-label="ลบไฟล์แนบ"
+        style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#EF4444;color:#fff;border:none;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;line-height:1">✕</button>
+    </div>`).join('');
+}
 
-  // Note: การอัปโหลดจริงต้องใช้ Google Drive API หรือ Firebase Storage
-  // ในเวอร์ชันนี้จะแนบชื่อไฟล์ไว้ในข้อความก่อน
+function removeAttach(i) {
+  if (pendingAttachments[i]?.localUrl) URL.revokeObjectURL(pendingAttachments[i].localUrl);
+  pendingAttachments.splice(i, 1);
+  renderAttachPreviews();
+}
+
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* อัปโหลดไฟล์ไปยัง Drive ผ่าน Apps Script doPost */
+async function uploadFilesToDrive() {
+  if (!pendingAttachments.length) return { imageUrl: '', fileName: '' };
+
+  const results = [];
+  for (const att of pendingAttachments) {
+    showToast(`กำลังอัปโหลด ${att.fileName}…`);
+    try {
+      const base64 = await fileToBase64(att.file);
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action:   'upload',
+          filename: att.fileName,
+          mimeType: att.mimeType,
+          base64:   base64.split(',')[1], // strip data:...;base64,
+        })
+      });
+      const json = await res.json();
+      if (json.status === 'ok') results.push(json.data);
+      else throw new Error(json.message);
+    } catch(e) {
+      console.warn('upload error', e);
+      showToast(`อัปโหลด ${att.fileName} ไม่สำเร็จ`);
+    }
+  }
+
+  // คืน URL รูปแรก + ชื่อไฟล์ทั้งหมด
+  const imageResult = results.find(r => r.mimeType?.startsWith('image/'));
+  const fileNames   = results.map(r => r.filename).join(', ');
+  const imageUrl    = imageResult?.thumbUrl || '';
+  const allViewUrls = results.map(r => r.viewUrl).join('|||');
+  return { imageUrl, fileName: fileNames, viewUrls: allViewUrls };
+}
+
+function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload  = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
 }
 
 /* liked post IDs เก็บใน localStorage — คงอยู่ข้ามเซสชัน */
