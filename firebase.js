@@ -1,22 +1,9 @@
 /* ════════════════════════════════════════════
-   ExportSpace — firebase.js
-   Realtime: Online Presence + Direct Message + Feed listener
-   Firebase Realtime Database (Spark — free)
+   ExportSpace — firebase.js v2
+   Realtime: Presence + Direct Message + Feed signal
    ════════════════════════════════════════════ */
 
-/* ── โหลด Firebase SDK จาก CDN (compat version — ใช้ใน HTML ธรรมดาได้) ── */
 const FB_SDK = 'https://www.gstatic.com/firebasejs/10.12.2';
-
-function loadScript(src) {
-  return new Promise((res, rej) => {
-    if (document.querySelector(`script[src="${src}"]`)) { res(); return; }
-    const s = document.createElement('script');
-    s.src = src; s.onload = res; s.onerror = rej;
-    document.head.appendChild(s);
-  });
-}
-
-/* ── Firebase config ── */
 const FB_CONFIG = {
   apiKey:            "AIzaSyBxOFMM4dC_50jWoG6JHnpfmD2I0AWu3fc",
   authDomain:        "exportspace-c8777.firebaseapp.com",
@@ -27,50 +14,62 @@ const FB_CONFIG = {
   appId:             "1:420770714233:web:490daa0db34323382cbaa8",
 };
 
-/* ── References ── */
-let db      = null;   // Firebase Database instance
-let fbUser  = null;   // { email, name, uid (= email safe key) }
-let dmUnsubscribers = {}; // cleanup listeners
+let db     = null;
+let fbUser = null;
+let _presenceRef = null;
+let _dmUnsubMsg  = null;
+let _dmUnsubTyp  = null;
+let _activeDMUser = null;
+let _typingTimer  = null;
+let _dmBadgeCount = 0;
 
-/* ═══ INIT ═══ */
+/* ════════════════════════════════════════════
+   INIT
+════════════════════════════════════════════ */
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    if (document.querySelector(`script[src="${src}"]`)) { res(); return; }
+    const s = document.createElement('script');
+    s.src = src; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
 async function initFirebase(user) {
-  if (db) { setPresence(user); return; }
+  if (db) { _setPresence(user); return; }
   try {
     await loadScript(`${FB_SDK}/firebase-app-compat.js`);
     await loadScript(`${FB_SDK}/firebase-database-compat.js`);
-
     if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
-    db     = firebase.database();
-    fbUser = { ...user, uid: emailToKey(user.email) };
-
-    setPresence(fbUser);
-    listenFeedRealtime();
-    listenIncomingDM();
-    console.log('[Firebase] connected ✓');
+    db = firebase.database();
+    fbUser = { ...user, uid: _emailKey(user.email) };
+    _setPresence(fbUser);
+    _listenFeedSignal();
+    _listenIncomingDM();
+    _injectDMStyles();
+    _buildDMBox();
+    console.log('[Firebase] ✓ connected as', fbUser.email);
   } catch(e) {
     console.warn('[Firebase] init failed:', e.message);
   }
 }
 
-/* ═══════════════════════════════════════════
-   PRESENCE — ใครออนไลน์บ้าง (realtime)
-═══════════════════════════════════════════ */
-function setPresence(user) {
+/* ════════════════════════════════════════════
+   PRESENCE
+════════════════════════════════════════════ */
+function _setPresence(user) {
   if (!db || !user) return;
-  const uid     = emailToKey(user.email);
-  const presRef = db.ref(`presence/${uid}`);
-  const connRef = db.ref('.info/connected');
+  const uid  = _emailKey(user.email);
+  const pRef = db.ref('presence/' + uid);
+  _presenceRef = pRef;
 
-  connRef.on('value', snap => {
+  db.ref('.info/connected').on('value', snap => {
     if (!snap.val()) return;
-    // เมื่อ disconnect → ลบ presence อัตโนมัติ
-    presRef.onDisconnect().remove();
-    presRef.set({
-      name:     user.name,
-      email:    user.email,
-      dept:     user.dept || '',
-      online:   true,
-      last_seen: firebase.database.ServerValue.TIMESTAMP,
+    pRef.onDisconnect().remove();
+    pRef.set({
+      name: user.name, email: user.email,
+      dept: user.dept || '', online: true,
+      ts: firebase.database.ServerValue.TIMESTAMP,
     });
   });
 }
@@ -78,322 +77,305 @@ function setPresence(user) {
 function listenOnlineUsers(callback) {
   if (!db) return () => {};
   const ref = db.ref('presence');
-  const handler = snap => {
-    const users = [];
-    snap.forEach(child => {
-      const u = child.val();
-      if (u && u.online) users.push(u);
-    });
-    callback(users);
+  const fn  = snap => {
+    const list = [];
+    snap.forEach(c => { const v = c.val(); if (v?.online) list.push(v); });
+    callback(list);
   };
-  ref.on('value', handler);
-  return () => ref.off('value', handler); // unsubscribe
+  ref.on('value', fn);
+  return () => ref.off('value', fn);
 }
 
-/* ═══════════════════════════════════════════
-   FEED — โพสต์ใหม่ขึ้น feed ทันที (realtime)
-═══════════════════════════════════════════ */
-function listenFeedRealtime() {
+/* ════════════════════════════════════════════
+   FEED SIGNAL
+════════════════════════════════════════════ */
+function _listenFeedSignal() {
   if (!db) return;
-  // ฟัง child_added เฉพาะหลัง session เริ่ม
   const since = Date.now();
   db.ref('feed_signal').on('child_added', snap => {
     const sig = snap.val();
-    if (!sig || sig.ts < since) return;
-    if (sig.author === fbUser?.name) return; // ไม่แจ้งตัวเอง
-
-    // invalidate cache แล้วโหลด posts ใหม่
+    if (!sig || sig.ts < since || sig.author === fbUser?.name) return;
     if (typeof invalidateCache === 'function') invalidateCache('Posts');
-    if (typeof loadPosts      === 'function') loadPosts();
-
-    showFeedToast(`${sig.author} โพสต์ใหม่`);
+    if (typeof loadPosts === 'function') loadPosts();
+    _toast('🔔 ' + sig.author + ' โพสต์ใหม่');
   });
 }
 
-/* เรียกหลังโพสต์สำเร็จ — ส่ง signal ให้คนอื่น */
 function signalNewPost(author) {
   if (!db) return;
   db.ref('feed_signal').push({ author, ts: firebase.database.ServerValue.TIMESTAMP });
 }
 
-/* ═══════════════════════════════════════════
-   DIRECT MESSAGE
-═══════════════════════════════════════════ */
-/* สร้าง room key จาก 2 email เรียงตามตัวอักษร → consistent key */
-function dmRoomKey(emailA, emailB) {
-  const a = emailToKey(emailA), b = emailToKey(emailB);
-  return a < b ? `${a}__${b}` : `${b}__${a}`;
+/* ════════════════════════════════════════════
+   DIRECT MESSAGE — core
+════════════════════════════════════════════ */
+function _roomKey(emailA, emailB) {
+  const a = _emailKey(emailA), b = _emailKey(emailB);
+  return a < b ? a + '__' + b : b + '__' + a;
 }
 
-/* ส่งข้อความ */
 async function sendDM(toUser, text) {
   if (!db || !fbUser || !text.trim()) return false;
-  const room = dmRoomKey(fbUser.email, toUser.email);
-  await db.ref(`dm/${room}`).push({
-    from:      fbUser.name,
-    fromEmail: fbUser.email,
-    to:        toUser.name,
-    toEmail:   toUser.email,
-    text:      text.trim(),
-    ts:        firebase.database.ServerValue.TIMESTAMP,
-    read:      false,
+  const room = _roomKey(fbUser.email, toUser.email);
+  await db.ref('dm/' + room).push({
+    from: fbUser.name, fromEmail: fbUser.email,
+    to: toUser.name,   toEmail:   toUser.email,
+    text: text.trim(),
+    ts:   firebase.database.ServerValue.TIMESTAMP,
+    read: false,
   });
   return true;
 }
 
-/* ฟัง DM ในห้องนี้ */
-function listenDM(toUser, callback) {
+function _listenDM(toUser, callback) {
   if (!db || !fbUser) return () => {};
-  const room    = dmRoomKey(fbUser.email, toUser.email);
-  const ref     = db.ref(`dm/${room}`).orderByChild('ts').limitToLast(50);
-  const handler = snap => {
+  const room = _roomKey(fbUser.email, toUser.email);
+  const ref  = db.ref('dm/' + room).orderByChild('ts').limitToLast(60);
+  const fn   = snap => {
     const msgs = [];
     snap.forEach(c => msgs.push({ id: c.key, ...c.val() }));
     callback(msgs);
   };
-  ref.on('value', handler);
-  dmUnsubscribers[room] = () => ref.off('value', handler);
-  return dmUnsubscribers[room];
+  ref.on('value', fn);
+  return () => ref.off('value', fn);
 }
 
-/* ฟัง DM ขาเข้าทุกห้อง */
-function listenIncomingDM() {
-  if (!db || !fbUser) return;
-  const myKey = emailToKey(fbUser.email);
-
-  db.ref('dm').on('child_added', roomSnap => {
-    const roomKey = roomSnap.key;
-    if (!roomKey.includes(myKey)) return; // ไม่ใช่ห้องของเรา
-
-    roomSnap.ref.orderByChild('ts').limitToLast(1).on('child_added', msgSnap => {
-      const msg = msgSnap.val();
-      if (!msg || msg.fromEmail === fbUser.email) return;
-      if (!msg.read) {
-        showDMToast(msg.from, msg.text);
-        updateDMBadge(msg.from, msg.fromEmail);
-      }
-    });
-  });
-}
-
-/* Mark messages as read */
-function markDMRead(toUser) {
-  if (!db || !fbUser) return;
-  const room = dmRoomKey(fbUser.email, toUser.email);
-  db.ref(`dm/${room}`).once('value', snap => {
-    const updates = {};
-    snap.forEach(c => {
-      if (c.val().fromEmail !== fbUser.email && !c.val().read) {
-        updates[`${c.key}/read`] = true;
-      }
-    });
-    if (Object.keys(updates).length) db.ref(`dm/${room}`).update(updates);
-  });
-}
-
-/* ── Typing indicator ── */
-function setTyping(toUser, isTyping) {
-  if (!db || !fbUser) return;
-  const room = dmRoomKey(fbUser.email, toUser.email);
-  db.ref(`typing/${room}/${fbUser.uid}`).set(isTyping ? fbUser.name : null);
-}
-
-function listenTyping(toUser, callback) {
+function _listenTyping(toUser, callback) {
   if (!db || !fbUser) return () => {};
-  const room = dmRoomKey(fbUser.email, toUser.email);
-  const ref  = db.ref(`typing/${room}`);
-  const handler = snap => {
+  const room = _roomKey(fbUser.email, toUser.email);
+  const ref  = db.ref('typing/' + room);
+  const fn   = snap => {
     const typers = [];
     snap.forEach(c => { if (c.key !== fbUser.uid && c.val()) typers.push(c.val()); });
     callback(typers);
   };
-  ref.on('value', handler);
-  return () => ref.off('value', handler);
+  ref.on('value', fn);
+  return () => ref.off('value', fn);
 }
 
-/* ═══════════════════════════════════════════
-   DM UI — กล่อง Chat
-═══════════════════════════════════════════ */
-let activeDMUser   = null;
-let dmUnsubMessage = null;
-let dmUnsubTyping  = null;
+function _setTyping(isTyping) {
+  if (!db || !fbUser || !_activeDMUser) return;
+  const room = _roomKey(fbUser.email, _activeDMUser.email);
+  db.ref('typing/' + room + '/' + fbUser.uid).set(isTyping ? fbUser.name : null);
+}
 
-function openDM(toUser) {
-  closeDM();
-  activeDMUser = toUser;
-  markDMRead(toUser);
-
-  const box = document.getElementById('dm-box');
-  if (!box) { createDMBox(); }
-  const b = document.getElementById('dm-box');
-  b.style.display = 'flex';
-  document.getElementById('dm-title').textContent = `💬 ${toUser.name}`;
-  document.getElementById('dm-messages').innerHTML =
-    '<div style="text-align:center;padding:20px;font-size:13px;color:var(--text-tertiary)">กำลังโหลด…</div>';
-
-  dmUnsubMessage = listenDM(toUser, msgs => renderDMMessages(msgs, toUser));
-  dmUnsubTyping  = listenTyping(toUser, typers => {
-    const el = document.getElementById('dm-typing');
-    if (el) el.textContent = typers.length ? `${typers.join(', ')} กำลังพิมพ์…` : '';
+function _markRead(toUser) {
+  if (!db || !fbUser) return;
+  const room = _roomKey(fbUser.email, toUser.email);
+  db.ref('dm/' + room).once('value', snap => {
+    const updates = {};
+    snap.forEach(c => {
+      if (c.val()?.fromEmail !== fbUser.email && !c.val()?.read) updates[c.key + '/read'] = true;
+    });
+    if (Object.keys(updates).length) db.ref('dm/' + room).update(updates);
   });
 }
 
+function _listenIncomingDM() {
+  if (!db || !fbUser) return;
+  const myKey = _emailKey(fbUser.email);
+  const since = Date.now();
+  db.ref('dm').on('child_added', roomSnap => {
+    if (!roomSnap.key.includes(myKey)) return;
+    roomSnap.ref.orderByChild('ts').limitToLast(1).on('child_added', msgSnap => {
+      const msg = msgSnap.val();
+      if (!msg || msg.ts < since || msg.fromEmail === fbUser.email) return;
+      if (!msg.read) {
+        _showDMToast(msg.from, msg.text, { name: msg.from, email: msg.fromEmail });
+        _dmBadgeCount++;
+        _updateMsgBadge(_dmBadgeCount);
+      }
+    });
+  });
+}
+
+/* ════════════════════════════════════════════
+   DM UI BOX
+════════════════════════════════════════════ */
+function openDM(toUserOrJson) {
+  // รองรับทั้ง object และ JSON string จาก onclick attribute
+  let toUser = toUserOrJson;
+  if (typeof toUser === 'string') {
+    try { toUser = JSON.parse(toUser); } catch(e) { return; }
+  }
+  if (!toUser?.email) return;
+
+  // ถ้าเปิดห้องเดิมอยู่ → ปิดก่อน
+  if (_dmUnsubMsg) { _dmUnsubMsg(); _dmUnsubMsg = null; }
+  if (_dmUnsubTyp) { _dmUnsubTyp(); _dmUnsubTyp = null; }
+  if (_activeDMUser) _setTyping(false);
+
+  _activeDMUser = toUser;
+  _markRead(toUser);
+
+  const box = document.getElementById('dm-box');
+  if (!box) { _buildDMBox(); }
+
+  document.getElementById('dm-box').style.display    = 'flex';
+  document.getElementById('dm-title').textContent    = '💬 ' + toUser.name;
+  document.getElementById('dm-messages').innerHTML   =
+    '<div style="text-align:center;padding:20px;font-size:13px;color:#94A3B8">กำลังโหลด…</div>';
+  document.getElementById('dm-typing-bar').textContent = '';
+
+  // reset unread badge สำหรับคนนี้
+  _dmBadgeCount = Math.max(0, _dmBadgeCount - 1);
+  _updateMsgBadge(_dmBadgeCount);
+
+  _dmUnsubMsg = _listenDM(toUser, msgs => _renderMsgs(msgs));
+  _dmUnsubTyp = _listenTyping(toUser, typers => {
+    const el = document.getElementById('dm-typing-bar');
+    if (el) el.textContent = typers.length ? typers.join(', ') + ' กำลังพิมพ์…' : '';
+  });
+
+  document.getElementById('dm-input')?.focus();
+}
+
 function closeDM() {
-  if (dmUnsubMessage) { dmUnsubMessage(); dmUnsubMessage = null; }
-  if (dmUnsubTyping)  { dmUnsubTyping();  dmUnsubTyping  = null; }
-  if (activeDMUser) { setTyping(activeDMUser, false); activeDMUser = null; }
-  const b = document.getElementById('dm-box');
-  if (b) b.style.display = 'none';
-}
-
-function createDMBox() {
-  const box = document.createElement('div');
-  box.id = 'dm-box';
-  box.setAttribute('role', 'dialog');
-  box.setAttribute('aria-label', 'Direct Message');
-  box.innerHTML = `
-    <div id="dm-header">
-      <span id="dm-title" style="font-size:14px;font-weight:600"></span>
-      <button id="dm-close" aria-label="ปิด" onclick="closeDM()">✕</button>
-    </div>
-    <div id="dm-messages" role="log" aria-live="polite"></div>
-    <div id="dm-typing" style="font-size:11px;color:var(--text-tertiary);padding:0 12px 2px;min-height:16px"></div>
-    <div id="dm-input-row">
-      <input id="dm-input" type="text" placeholder="พิมพ์ข้อความ…" aria-label="ข้อความ"
-        maxlength="500"
-        oninput="handleDMTyping()"
-        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitDM();}">
-      <button id="dm-send" onclick="submitDM()" aria-label="ส่ง">
-        <i class="ti ti-send" aria-hidden="true"></i>
-      </button>
-    </div>`;
-  document.body.appendChild(box);
-
-  /* inject DM styles */
-  if (!document.getElementById('dm-styles')) {
-    const st = document.createElement('style');
-    st.id = 'dm-styles';
-    st.textContent = `
-      #dm-box{position:fixed;bottom:20px;right:20px;width:320px;height:420px;
-        background:var(--bg-surface,#fff);border:1px solid var(--border,#E4E6EB);
-        border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.14);
-        display:flex;flex-direction:column;z-index:500;overflow:hidden}
-      #dm-header{display:flex;align-items:center;justify-content:space-between;
-        padding:12px 14px;border-bottom:1px solid var(--border,#E4E6EB);
-        background:var(--accent,#1D4E8F);color:#fff;border-radius:16px 16px 0 0}
-      #dm-header #dm-title{color:#fff}
-      #dm-close{background:none;border:none;color:#fff;font-size:18px;cursor:pointer;
-        padding:2px 6px;border-radius:6px;line-height:1}
-      #dm-close:hover{background:rgba(255,255,255,.2)}
-      #dm-messages{flex:1;overflow-y:auto;padding:10px 12px;
-        display:flex;flex-direction:column;gap:8px;scrollbar-width:thin}
-      .dm-msg{max-width:78%;padding:8px 12px;border-radius:14px;
-        font-size:13px;line-height:1.5;word-break:break-word}
-      .dm-msg.mine{align-self:flex-end;background:var(--accent,#1D4E8F);color:#fff;
-        border-bottom-right-radius:4px}
-      .dm-msg.theirs{align-self:flex-start;background:var(--bg-hover,#F2F2F2);
-        color:var(--text-primary,#050505);border-bottom-left-radius:4px}
-      .dm-msg .dm-meta{font-size:10px;opacity:.65;margin-top:3px}
-      .dm-msg.mine .dm-meta{text-align:right}
-      #dm-input-row{display:flex;gap:6px;padding:8px 10px;
-        border-top:1px solid var(--border,#E4E6EB)}
-      #dm-input{flex:1;padding:8px 12px;border:1px solid var(--border,#E4E6EB);
-        border-radius:20px;font-size:13px;background:var(--bg-subtle,#F0F2F5);
-        color:var(--text-primary,#050505);outline:none;font-family:inherit}
-      #dm-input:focus{border-color:var(--accent,#1D4E8F)}
-      #dm-send{width:36px;height:36px;border-radius:50%;background:var(--accent,#1D4E8F);
-        color:#fff;border:none;cursor:pointer;display:flex;align-items:center;
-        justify-content:center;font-size:16px;flex-shrink:0}
-      #dm-send:hover{opacity:.9}
-      .dm-toast{position:fixed;bottom:450px;right:20px;background:#1C1C1E;color:#fff;
-        padding:10px 14px;border-radius:12px;font-size:13px;z-index:600;
-        animation:slideUp .3s ease;max-width:240px;cursor:pointer;line-height:1.4}
-      .dm-toast strong{display:block;margin-bottom:2px}
-      @keyframes slideUp{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
-      .online-dot-live{width:8px;height:8px;border-radius:50%;background:#22C55E;
-        display:inline-block;margin-right:5px;animation:pulse2 2s infinite}
-      @keyframes pulse2{0%,100%{opacity:1}50%{opacity:.4}}
-      .dm-btn{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;
-        border-radius:6px;font-size:11px;background:var(--accent-light,#DBEAFE);
-        color:var(--accent,#1D4E8F);border:none;cursor:pointer;font-family:inherit}
-      .dm-btn:hover{background:var(--accent,#1D4E8F);color:#fff}
-    `;
-    document.head.appendChild(st);
-  }
-}
-
-function renderDMMessages(msgs, toUser) {
-  const el = document.getElementById('dm-messages');
-  if (!el) return;
-  if (!msgs.length) {
-    el.innerHTML = `<div style="text-align:center;padding:24px;font-size:13px;
-      color:var(--text-tertiary)">เริ่มการสนทนากับ ${toUser.name}</div>`;
-    return;
-  }
-  el.innerHTML = msgs.map(m => {
-    const mine   = m.fromEmail === fbUser?.email;
-    const time   = m.ts ? new Date(m.ts).toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' }) : '';
-    const read   = mine && m.read ? ' · อ่านแล้ว' : '';
-    return `<div class="dm-msg ${mine ? 'mine' : 'theirs'}">
-      ${escFB(m.text)}
-      <div class="dm-meta">${time}${read}</div>
-    </div>`;
-  }).join('');
-  el.scrollTop = el.scrollHeight;
+  if (_dmUnsubMsg) { _dmUnsubMsg(); _dmUnsubMsg = null; }
+  if (_dmUnsubTyp) { _dmUnsubTyp(); _dmUnsubTyp = null; }
+  _setTyping(false);
+  _activeDMUser = null;
+  const box = document.getElementById('dm-box');
+  if (box) box.style.display = 'none';
 }
 
 async function submitDM() {
   const input = document.getElementById('dm-input');
-  const text  = input?.value?.trim();
-  if (!text || !activeDMUser) return;
+  const text  = (input?.value || '').trim();
+  if (!text || !_activeDMUser || !fbUser) return;
   input.value = '';
-  setTyping(activeDMUser, false);
-  await sendDM(activeDMUser, text);
+  _setTyping(false);
+
+  // แสดงข้อความตัวเองทันที (optimistic)
+  _appendMsg({ from: fbUser.name, fromEmail: fbUser.email, text, ts: Date.now(), read: false });
+
+  await sendDM(_activeDMUser, text);
 }
 
-let typingTimer;
-function handleDMTyping() {
-  if (!activeDMUser) return;
-  setTyping(activeDMUser, true);
-  clearTimeout(typingTimer);
-  typingTimer = setTimeout(() => setTyping(activeDMUser, false), 2500);
+function _appendMsg(m) {
+  const el = document.getElementById('dm-messages');
+  if (!el) return;
+  // ลบ placeholder ถ้ามี
+  const placeholder = el.querySelector('[data-placeholder]');
+  if (placeholder) placeholder.remove();
+
+  const mine  = m.fromEmail === fbUser?.email;
+  const time  = new Date(m.ts || Date.now()).toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
+  const div   = document.createElement('div');
+  div.className = 'dm-msg ' + (mine ? 'mine' : 'theirs');
+  div.innerHTML = _esc(m.text) + '<div class="dm-meta">' + time + (mine && m.read ? ' · อ่านแล้ว' : '') + '</div>';
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
 }
 
-/* ═══════════════════════════════════════════
-   NOTIFICATIONS
-═══════════════════════════════════════════ */
-let dmBadges = {}; // { email: count }
-
-function showDMToast(fromName, text) {
-  const prev = document.querySelector('.dm-toast');
-  if (prev) prev.remove();
-  const t = document.createElement('div');
-  t.className = 'dm-toast';
-  t.innerHTML = `<strong>💬 ${escFB(fromName)}</strong>${escFB(text.slice(0,60))}${text.length>60?'…':''}`;
-  t.onclick   = () => { t.remove(); };
-  document.body.appendChild(t);
-  setTimeout(() => t?.remove(), 5000);
+function _renderMsgs(msgs) {
+  const el = document.getElementById('dm-messages');
+  if (!el) return;
+  if (!msgs.length) {
+    el.innerHTML = '<div data-placeholder style="text-align:center;padding:24px;font-size:13px;color:#94A3B8">เริ่มการสนทนา — พิมพ์ข้อความด้านล่าง</div>';
+    return;
+  }
+  el.innerHTML = msgs.map(m => {
+    const mine = m.fromEmail === fbUser?.email;
+    const time = m.ts ? new Date(m.ts).toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' }) : '';
+    return '<div class="dm-msg ' + (mine ? 'mine' : 'theirs') + '">'
+      + _esc(m.text)
+      + '<div class="dm-meta">' + time + (mine && m.read ? ' · อ่านแล้ว' : '') + '</div>'
+      + '</div>';
+  }).join('');
+  el.scrollTop = el.scrollHeight;
 }
 
-function showFeedToast(msg) {
-  if (typeof showToast === 'function') showToast('🔔 ' + msg);
-}
-
-function updateDMBadge(fromName, fromEmail) {
-  dmBadges[fromEmail] = (dmBadges[fromEmail] || 0) + 1;
-  const msgBtn = document.querySelector('#topnav .nav-action-btn[aria-label="ข้อความ"]');
-  if (msgBtn) {
-    let badge = msgBtn.querySelector('.notif-badge');
-    if (!badge) { badge = document.createElement('span'); badge.className = 'notif-badge'; msgBtn.appendChild(badge); }
-    const total = Object.values(dmBadges).reduce((a,b)=>a+b,0);
-    badge.textContent = total;
-    badge.style.display = total ? '' : 'none';
+function _onDMKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitDM(); }
+  else {
+    _setTyping(true);
+    clearTimeout(_typingTimer);
+    _typingTimer = setTimeout(() => _setTyping(false), 2500);
   }
 }
 
-/* ═══════════════════════════════════════════
-   ONLINE USERS PANEL (ใช้แทน render เดิม)
-═══════════════════════════════════════════ */
+function _buildDMBox() {
+  if (document.getElementById('dm-box')) return;
+  const box = document.createElement('div');
+  box.id = 'dm-box';
+  box.setAttribute('role', 'dialog');
+  box.setAttribute('aria-label', 'Direct Message');
+  box.style.display = 'none';
+  box.innerHTML =
+    '<div id="dm-header">'
+    +  '<span id="dm-title"></span>'
+    +  '<button id="dm-close" onclick="closeDM()" aria-label="ปิด">✕</button>'
+    + '</div>'
+    + '<div id="dm-messages" role="log" aria-live="polite"></div>'
+    + '<div id="dm-typing-bar"></div>'
+    + '<div id="dm-input-row">'
+    +   '<input id="dm-input" type="text" placeholder="พิมพ์ข้อความ… (Enter ส่ง)" maxlength="500" aria-label="ข้อความ">'
+    +   '<button id="dm-send" aria-label="ส่ง"><i class="ti ti-send" aria-hidden="true"></i></button>'
+    + '</div>';
+  document.body.appendChild(box);
+
+  document.getElementById('dm-input').addEventListener('keydown', _onDMKeydown);
+  document.getElementById('dm-send').addEventListener('click', submitDM);
+}
+
+function _injectDMStyles() {
+  if (document.getElementById('dm-css')) return;
+  const s = document.createElement('style');
+  s.id = 'dm-css';
+  s.textContent = [
+    '#dm-box{position:fixed;bottom:20px;right:20px;width:320px;height:420px;',
+    'background:#fff;border:1px solid #E4E6EB;border-radius:16px;',
+    'box-shadow:0 8px 32px rgba(0,0,0,.18);display:flex;flex-direction:column;z-index:9999;overflow:hidden}',
+    '[data-theme=dark] #dm-box{background:#1C2029;border-color:#2E3340}',
+    '#dm-header{display:flex;align-items:center;justify-content:space-between;',
+    'padding:12px 14px;background:#1D4E8F;border-radius:16px 16px 0 0;flex-shrink:0}',
+    '[data-accent=green] #dm-header{background:#2D6A4F}',
+    '[data-accent=purple] #dm-header{background:#7C3AED}',
+    '[data-accent=amber] #dm-header{background:#B45309}',
+    '[data-accent=red] #dm-header{background:#B91C1C}',
+    '[data-accent=teal] #dm-header{background:#0F766E}',
+    '#dm-title{font-size:14px;font-weight:600;color:#fff}',
+    '#dm-close{background:none;border:none;color:#fff;font-size:18px;cursor:pointer;',
+    'padding:2px 8px;border-radius:6px;line-height:1;opacity:.85}',
+    '#dm-close:hover{opacity:1;background:rgba(255,255,255,.2)}',
+    '#dm-messages{flex:1;overflow-y:auto;padding:10px 12px;',
+    'display:flex;flex-direction:column;gap:6px;scrollbar-width:thin}',
+    '#dm-typing-bar{font-size:11px;color:#94A3B8;padding:0 14px 3px;min-height:18px;flex-shrink:0}',
+    '#dm-input-row{display:flex;gap:6px;padding:8px 10px;border-top:1px solid #E4E6EB;flex-shrink:0}',
+    '[data-theme=dark] #dm-input-row{border-color:#2E3340}',
+    '#dm-input{flex:1;padding:8px 12px;border:1px solid #E4E6EB;border-radius:20px;',
+    'font-size:13px;background:#F0F2F5;color:#050505;outline:none;font-family:inherit}',
+    '[data-theme=dark] #dm-input{background:#252A36;border-color:#2E3340;color:#E8EAED}',
+    '#dm-input:focus{border-color:#1D4E8F;box-shadow:0 0 0 2px rgba(29,78,143,.15)}',
+    '#dm-send{width:36px;height:36px;border-radius:50%;background:#1D4E8F;',
+    'color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}',
+    '#dm-send:hover{opacity:.88}',
+    '.dm-msg{max-width:80%;padding:8px 12px;border-radius:14px;font-size:13px;line-height:1.5;word-break:break-word}',
+    '.dm-msg.mine{align-self:flex-end;background:#1D4E8F;color:#fff;border-bottom-right-radius:4px}',
+    '.dm-msg.theirs{align-self:flex-start;background:#F0F2F5;color:#050505;border-bottom-left-radius:4px}',
+    '[data-theme=dark] .dm-msg.theirs{background:#2E3340;color:#E8EAED}',
+    '.dm-meta{font-size:10px;margin-top:3px;opacity:.65}',
+    '.dm-msg.mine .dm-meta{text-align:right}',
+    '.dm-btn{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;',
+    'border-radius:6px;font-size:11px;background:#DBEAFE;color:#1D4E8F;border:none;cursor:pointer;font-family:inherit;white-space:nowrap}',
+    '.dm-btn:hover{background:#1D4E8F;color:#fff}',
+    '.dm-toast{position:fixed;bottom:460px;right:20px;background:#1C1C1E;color:#fff;',
+    'padding:10px 14px;border-radius:12px;font-size:13px;z-index:10000;',
+    'box-shadow:0 4px 20px rgba(0,0,0,.25);max-width:260px;cursor:pointer;line-height:1.4;',
+    'animation:_dmSlide .25s ease}',
+    '@keyframes _dmSlide{from{transform:translateY(8px);opacity:0}to{opacity:1;transform:none}}',
+    '.dm-toast strong{display:block;margin-bottom:2px;font-size:12px}',
+    '.ol-dot-live{width:8px;height:8px;border-radius:50%;background:#22C55E;',
+    'display:inline-block;margin-right:4px;animation:_pulse 2s infinite}',
+    '@keyframes _pulse{0%,100%{opacity:1}50%{opacity:.35}}',
+  ].join('');
+  document.head.appendChild(s);
+}
+
+/* ════════════════════════════════════════════
+   ONLINE USER LIST — render พร้อมปุ่ม DM
+════════════════════════════════════════════ */
 function startRealtimeOnlineUsers() {
   return listenOnlineUsers(users => {
     const list  = document.getElementById('online-list');
@@ -401,45 +383,67 @@ function startRealtimeOnlineUsers() {
     if (!list) return;
     if (count) count.textContent = users.length;
     if (!users.length) {
-      list.innerHTML = '<li style="font-size:13px;color:var(--text-tertiary);padding:8px 16px">ยังไม่มีใครออนไลน์</li>';
+      list.innerHTML = '<li style="font-size:13px;color:var(--text-tertiary,#94A3B8);padding:8px 16px">ยังไม่มีใครออนไลน์</li>';
       return;
     }
     list.innerHTML = users.map(u => {
-      const ini = (u.name||'?').trim().split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase();
-      const col = nameColorFB(u.name||'');
-      return `<li class="online-item">
-        <div class="ol-wrap">
-          <div class="avatar sm" style="background:${col}">${escFB(ini)}</div>
-          <span class="ol-dot" style="background:#22C55E"></span>
-        </div>
-        <div class="ol-info">
-          <div class="ol-name">${escFB(u.name||u.email)}</div>
-          <div class="ol-status">
-            <span class="online-dot-live"></span>ออนไลน์
-            ${u.email !== fbUser?.email
-              ? `<button class="dm-btn" onclick="openDM(${JSON.stringify({name:u.name,email:u.email}).replace(/"/g,'&quot;')})">
-                  <i class="ti ti-message" aria-hidden="true"></i> ส่ง DM
-                </button>` : '(คุณ)'}
-          </div>
-        </div>
-      </li>`;
+      const ini    = (u.name||'?').trim().split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+      const col    = _nameColor(u.name||'');
+      const isMe   = u.email === fbUser?.email;
+      const dmAttr = JSON.stringify({ name: u.name, email: u.email }).replace(/"/g, '&quot;');
+      return '<li class="online-item">'
+        + '<div class="ol-wrap">'
+        +   '<div class="avatar sm" style="background:' + col + '">' + _esc(ini) + '</div>'
+        +   '<span class="ol-dot" style="background:#22C55E"></span>'
+        + '</div>'
+        + '<div class="ol-info">'
+        +   '<div class="ol-name">' + _esc(u.name||u.email) + (isMe ? ' (คุณ)' : '') + '</div>'
+        +   '<div class="ol-status" style="display:flex;align-items:center;gap:6px">'
+        +     '<span class="ol-dot-live"></span>ออนไลน์'
+        +     (!isMe ? ' <button class="dm-btn" onclick="openDM(\'' + dmAttr.replace(/'/g, "\\'") + '\')">'
+        +       + '<i class="ti ti-message" aria-hidden="true"></i> DM</button>' : '')
+        +   '</div>'
+        + '</div>'
+        + '</li>';
     }).join('');
   });
 }
 
-/* ═══════════════════════════════════════════
-   UTILITIES
-═══════════════════════════════════════════ */
-function emailToKey(email) {
-  return (email||'').replace(/[.@]/g, '_').toLowerCase();
+/* ════════════════════════════════════════════
+   TOAST / BADGE / UTILS
+════════════════════════════════════════════ */
+function _showDMToast(fromName, text, fromUser) {
+  const prev = document.querySelector('.dm-toast');
+  if (prev) prev.remove();
+  const t = document.createElement('div');
+  t.className = 'dm-toast';
+  t.innerHTML = '<strong>💬 ' + _esc(fromName) + '</strong>' + _esc(text.slice(0,60)) + (text.length>60?'…':'');
+  t.onclick   = () => { t.remove(); if(fromUser) openDM(fromUser); };
+  document.body.appendChild(t);
+  setTimeout(() => t?.remove(), 6000);
 }
 
-function escFB(s) {
+function _toast(msg) {
+  if (typeof showToast === 'function') showToast(msg);
+}
+
+function _updateMsgBadge(n) {
+  const btn = document.querySelector('.nav-action-btn[aria-label="ข้อความ"]');
+  if (!btn) return;
+  let b = btn.querySelector('.notif-badge');
+  if (!b) { b = document.createElement('span'); b.className = 'notif-badge'; btn.appendChild(b); }
+  b.textContent    = n > 0 ? n : '';
+  b.style.display  = n > 0 ? '' : 'none';
+}
+
+function _emailKey(email) { return (email||'').replace(/[.@+]/g,'_').toLowerCase(); }
+
+function _esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-function nameColorFB(name) {
+function _nameColor(n) {
   const c=['#1D4E8F','#2D6A4F','#7C3AED','#B45309','#B91C1C','#0F766E','#4C1D95','#065F46'];
-  let h=0; for(const ch of name) h=(h*31+ch.charCodeAt(0))%c.length;
+  let h=0; for(const ch of n) h=(h*31+ch.charCodeAt(0))%c.length;
   return c[Math.abs(h)];
 }
