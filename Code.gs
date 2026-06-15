@@ -31,6 +31,10 @@ function doGet(e) {
       const f = getOrCreateFolder();
       result = { folderId: f.getId(), folderName: f.getName() };
     }
+    else if (action === 'upload') {
+      // รับไฟล์ผ่าน GET param (base64) — หลีกเลี่ยง CORS ของ browser
+      result = uploadFileToDrive(p.filename, p.mimeType, p.base64);
+    }
     else                             result = { error: 'unknown action: ' + action };
 
     output.setContent(JSON.stringify({ status:'ok', data:result }));
@@ -40,26 +44,7 @@ function doGet(e) {
   return output;
 }
 
-// ── doPost — รับไฟล์ upload ──
-function doPost(e) {
-  const output = ContentService.createTextOutput();
-  output.setMimeType(ContentService.MimeType.JSON);
-  try {
-    const p    = e.parameter || {};
-    const data = e.postData?.contents;
-
-    if (p.action === 'upload' && data) {
-      const json    = JSON.parse(data);
-      const result  = uploadFileToDrive(json.filename, json.mimeType, json.base64);
-      output.setContent(JSON.stringify({ status:'ok', data: result }));
-    } else {
-      output.setContent(JSON.stringify({ status:'error', message:'invalid upload request' }));
-    }
-  } catch(err) {
-    output.setContent(JSON.stringify({ status:'error', message: err.message }));
-  }
-  return output;
-}
+// upload ย้ายมาใน doGet แล้ว — ไม่ต้องใช้ doPost
 
 // ════════════════════════════════════════════
 // GOOGLE DRIVE — อัปโหลดและจัดการไฟล์

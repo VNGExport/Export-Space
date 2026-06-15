@@ -801,32 +801,71 @@ async function uploadFilesToDrive() {
   for (const att of pendingAttachments) {
     showToast(`กำลังอัปโหลด ${att.fileName}…`);
     try {
-      const base64 = await fileToBase64(att.file);
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action:   'upload',
-          filename: att.fileName,
-          mimeType: att.mimeType,
-          base64:   base64.split(',')[1], // strip data:...;base64,
-        })
+      const base64Full = await fileToBase64(att.file);
+      const base64Data = base64Full.split(',')[1]; // ตัด data:...;base64, ออก
+
+      // Apps Script รองรับเฉพาะ GET จาก browser (CORS)
+      // ส่ง base64 ผ่าน URL param — จำกัดที่ ~2MB ต่อไฟล์
+      const MAX_B64 = 1.8 * 1024 * 1024; // ~1.8MB base64 (รูปต้นฉบับ ~1.35MB)
+      if (base64Data.length > MAX_B64) {
+        showToast(`${att.fileName} ขนาดใหญ่เกิน 1.3MB — ลดขนาดรูปก่อนแนบ`);
+        continue;
+      }
+
+      // resize รูปภาพก่อนอัปโหลด (ลดขนาดให้เหมาะสม)
+      let uploadBase64 = base64Data;
+      let uploadMime   = att.mimeType;
+      if (att.mimeType.startsWith('image/')) {
+        const resized  = await resizeImage(att.file, 1200, 0.82);
+        uploadBase64   = resized.split(',')[1];
+        uploadMime     = 'image/jpeg';
+      }
+
+      const params = new URLSearchParams({
+        action:   'upload',
+        filename: att.fileName,
+        mimeType: uploadMime,
+        base64:   uploadBase64,
       });
+
+      const res  = await fetch(API_URL + '?' + params.toString());
       const json = await res.json();
-      if (json.status === 'ok') results.push(json.data);
-      else throw new Error(json.message);
+      if (json.status === 'ok') {
+        results.push(json.data);
+        showToast(`✓ อัปโหลด ${att.fileName} สำเร็จ`);
+      } else {
+        throw new Error(json.message || 'upload failed');
+      }
     } catch(e) {
-      console.warn('upload error', e);
-      showToast(`อัปโหลด ${att.fileName} ไม่สำเร็จ`);
+      console.warn('upload error:', e);
+      showToast(`อัปโหลด ${att.fileName} ไม่สำเร็จ: ` + e.message);
     }
   }
 
-  // คืน URL รูปแรก + ชื่อไฟล์ทั้งหมด
   const imageResult = results.find(r => r.mimeType?.startsWith('image/'));
   const fileNames   = results.map(r => r.filename).join(', ');
   const imageUrl    = imageResult?.thumbUrl || '';
   const allViewUrls = results.map(r => r.viewUrl).join('|||');
   return { imageUrl, fileName: fileNames, viewUrls: allViewUrls };
+}
+
+/* resize รูปก่อนอัปโหลด — ลดขนาดไฟล์ลงมาก */
+function resizeImage(file, maxW, quality) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const ratio  = Math.min(1, maxW / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.round(img.width  * ratio);
+      canvas.height = Math.round(img.height * ratio);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', quality || 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); fileToBase64(file).then(resolve); };
+    img.src = url;
+  });
 }
 
 function fileToBase64(file) {
