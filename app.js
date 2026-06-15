@@ -10,7 +10,7 @@
    วาง Web App URL ที่ได้จาก Deploy ตรงนี้
 ══════════════════════════════════════════ */
 const API_URL = (typeof CONFIG !== 'undefined') ? CONFIG.SHEETS_API
-  : "https://script.google.com/a/macros/vanachai.com/s/AKfycbzbF1MPtbGpFrhblZZH_p-XirBR0ZC1Kx0RV08l5qefz2pgv1ZjtC7Rn4wGLeyo_RKtsA/exec";
+  : "https://script.google.com/macros/s/AKfycbyOVLP70eaS7iMJHM0i62QFsOcEXwDX5JYpmCGjvzEg77UqFECNEb2Bm12CFAlvxIhdyw/exec";
 
 /* ── API HELPERS (GET only — หลีกเลี่ยง CORS) ── */
 async function apiGet(sheet) {
