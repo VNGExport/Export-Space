@@ -5,6 +5,38 @@
 
 'use strict';
 
+/* ══════════════════════════════════════════
+   GOOGLE APPS SCRIPT API
+   วาง Web App URL ที่ได้จาก Deploy ตรงนี้
+══════════════════════════════════════════ */
+const API_URL = "https://script.google.com/a/macros/vanachai.com/s/AKfycbyCaKlsKm0Cdmh7xJZt6RPV-2dOj8girN59E8ZeyZV0JJFg8J8x0vGjhSbxAbDdgYlFGg/exec";
+
+/* ── API HELPERS ── */
+async function apiGet(sheet) {
+  try {
+    const res = await fetch(`${API_URL}?sheet=${sheet}`);
+    const json = await res.json();
+    return json.status === 'ok' ? json.data : [];
+  } catch (e) {
+    console.error('API GET error:', e);
+    return [];
+  }
+}
+
+async function apiPost(action, sheet, data = {}, id = null) {
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action, sheet, data, id })
+    });
+    const json = await res.json();
+    return json.status === 'ok' ? json.data : null;
+  } catch (e) {
+    console.error('API POST error:', e);
+    return null;
+  }
+}
+
 /* ── STATE ── */
 const state = {
   theme: localStorage.getItem('ex-theme') || 'light',
@@ -153,14 +185,26 @@ function bindCreatePost() {
   });
 }
 
-function submitPost() {
+async function submitPost() {
   const input = document.getElementById('post-input');
   const text = input?.innerText?.trim();
   if (!text) { showToast('กรุณาพิมพ์ข้อความก่อนโพสต์'); return; }
 
+  // บันทึกลง Google Sheets
+  const saved = await apiPost('create', 'Posts', {
+    author: 'Ravee Digital Space',
+    dept: 'Export & Logistics',
+    content: text,
+    tag: 'ทั่วไป',
+    likes: 0
+  });
+
+  const postId = saved?.id || ('local-' + Date.now());
+
   const feed = document.getElementById('posts-feed');
   const article = document.createElement('article');
   article.className = 'post-card';
+  article.dataset.postId = postId;
   article.setAttribute('aria-label', 'โพสต์ใหม่ของคุณ');
   article.innerHTML = `
     <div class="post-header">
@@ -177,7 +221,7 @@ function submitPost() {
       <span>0 ความคิดเห็น</span>
     </div>
     <div class="post-actions">
-      <button class="post-action-btn like-btn" aria-label="ถูกใจ"><i class="ti ti-thumb-up" aria-hidden="true"></i> ถูกใจ</button>
+      <button class="post-action-btn like-btn" aria-label="ถูกใจ" data-post-id="${postId}"><i class="ti ti-thumb-up" aria-hidden="true"></i> ถูกใจ</button>
       <button class="post-action-btn" aria-label="แสดงความคิดเห็น"><i class="ti ti-message" aria-hidden="true"></i> ความคิดเห็น</button>
       <button class="post-action-btn" aria-label="แชร์"><i class="ti ti-share" aria-hidden="true"></i> แชร์</button>
     </div>`;
@@ -185,7 +229,7 @@ function submitPost() {
   feed.insertBefore(article, feed.firstChild);
   article.querySelector('.like-btn')?.addEventListener('click', handleLike);
   input.innerText = '';
-  showToast('โพสต์เรียบร้อย ✓');
+  showToast(saved ? 'โพสต์เรียบร้อย ✓ (บันทึกแล้ว)' : 'โพสต์แล้ว (offline)');
   article.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
@@ -198,10 +242,16 @@ function bindLikeButtons() {
   });
 }
 
-function handleLike(e) {
+async function handleLike(e) {
   const btn = e.currentTarget;
   btn.classList.toggle('liked');
   const isLiked = btn.classList.contains('liked');
+  const postId = btn.dataset.postId;
+
+  if (isLiked && postId && !postId.startsWith('local-')) {
+    await apiPost('like', 'Posts', {}, postId);
+  }
+
   showToast(isLiked ? 'ถูกใจแล้ว 👍' : 'เอาถูกใจออก');
 }
 
