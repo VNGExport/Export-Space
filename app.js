@@ -158,6 +158,14 @@ function logout() {
 function startApp(user) {
   state.user = user;
   keepScriptWarm();
+  // เริ่ม Firebase realtime (ถ้ามี user)
+  if (user && typeof initFirebase === 'function') {
+    initFirebase(user).then(() => {
+      if (typeof startRealtimeOnlineUsers === 'function') {
+        startRealtimeOnlineUsers();
+      }
+    });
+  }
   applyTheme(state.theme);
   applyAccent(state.accent);
   applyFontSize(state.fontSize);
@@ -594,7 +602,9 @@ async function submitPost() {
 
   input.innerText = '';
   if (btn) { btn.disabled = false; btn.textContent = 'โพสต์'; }
-  invalidateCache('Posts'); showToast(saved ? 'โพสต์แล้ว ✓' : 'โพสต์แล้ว (offline)');
+  invalidateCache('Posts');
+  if (saved && typeof signalNewPost === 'function') signalNewPost(user.name);
+  showToast(saved ? 'โพสต์แล้ว ✓' : 'โพสต์แล้ว (offline)');
 }
 
 /* ════════════════════════════════════════════
