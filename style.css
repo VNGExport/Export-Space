@@ -4,12 +4,10 @@
    Accent: Navy #0B2545 / Gold #C8972B — professional export identity
    ════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
-
 /* ── TOKENS ── */
 :root {
-  --font-main: 'IBM Plex Sans Thai', 'IBM Plex Sans', system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', monospace;
+  --font-main: 'Leelawadee UI', 'Leelawadee', 'Segoe UI', 'Tahoma', system-ui, sans-serif;
+  --font-mono: 'Consolas', 'Courier New', monospace;
 
   /* Navy-Gold brand palette */
   --c-navy-900: #050F1E;
