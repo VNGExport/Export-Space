@@ -42,6 +42,29 @@ async function api(params = {}) {
 }
 
 /* ════════════════════════════════════════════
+   PERFORMANCE: CACHE + KEEP-WARM
+════════════════════════════════════════════ */
+const CACHE = {};
+const CACHE_TTL = { Posts:5*60e3, Board:5*60e3, Users:10*60e3, Events:30*60e3 };
+
+async function apiCached(sheet) {
+  const now = Date.now(), c = CACHE[sheet];
+  if (c && (now - c.ts) < (CACHE_TTL[sheet]||5*60e3)) return c.data;
+  const data = await api({ action:'get', sheet });
+  if (data) CACHE[sheet] = { data, ts: now };
+  return data || (c ? c.data : null);
+}
+function invalidateCache(sheet) { delete CACHE[sheet]; }
+
+function keepScriptWarm() {
+  if (!API_URL) return;
+  setTimeout(() => {
+    fetch(API_URL + '?action=ping').catch(()=>{});
+    setInterval(() => fetch(API_URL + '?action=ping').catch(()=>{}), 4.5*60e3);
+  }, 10e3);
+}
+
+/* ════════════════════════════════════════════
    GOOGLE LOGIN
 ════════════════════════════════════════════ */
 function initAuth() {
@@ -134,6 +157,7 @@ function logout() {
 ════════════════════════════════════════════ */
 function startApp(user) {
   state.user = user;
+  keepScriptWarm();
   applyTheme(state.theme);
   applyAccent(state.accent);
   applyFontSize(state.fontSize);
@@ -209,11 +233,68 @@ function updateAllUserUI(u) {
   if (pi) pi.dataset.placeholder = `คุณคิดอะไรอยู่ ${u.name.split(' ')[0]}?`;
 }
 
+
+/* ── RENDER FROM PRE-FETCHED DATA (no extra fetch) ── */
+function renderPosts(posts) {
+  const feed = document.getElementById('posts-feed');
+  if (!feed) return;
+  if (!posts || posts.length === 0) {
+    feed.innerHTML = '<div class="empty-state"><i class="ti ti-mood-empty" style="font-size:36px"></i><p>ยังไม่มีโพสต์ — เป็นคนแรกที่โพสต์เลย!</p></div>';
+    return;
+  }
+  const sorted = [...posts].sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+  feed.innerHTML = sorted.map(postCard).join('');
+  feed.querySelectorAll('.like-btn').forEach(b => b.addEventListener('click', onLike));
+  feed.querySelectorAll('.post-more-btn').forEach(b => b.addEventListener('click', onPostMenu));
+}
+
+function renderOnlineUsers(users) {
+  const list  = document.getElementById('online-list');
+  const count = document.getElementById('online-count');
+  if (!list) return;
+  if (!users || users.length === 0) {
+    list.innerHTML = '<li style="font-size:13px;color:var(--text-tertiary);padding:8px 16px">ยังไม่มีข้อมูล</li>';
+    return;
+  }
+  const now = Date.now();
+  const online = users.filter(u => u.last_seen && (now - new Date(u.last_seen)) < 30*60*1000);
+  if (count) count.textContent = online.length || users.length;
+  const show = online.length ? online : users.slice(0,4);
+  list.innerHTML = show.map(u => {
+    const ini = initials(u.name || u.email || '?');
+    const col = nameColor(u.name || '');
+    const isOnline = u.last_seen && (now - new Date(u.last_seen)) < 30*60*1000;
+    return '<li class="online-item"><div class="ol-wrap"><div class="avatar sm" style="background:'+col+'">'+esc(ini)+'</div><span class="ol-dot" style="background:'+(isOnline?'#22C55E':'#FCD34D')+'"></span></div><div class="ol-info"><div class="ol-name">'+esc(u.name||u.email)+'</div><div class="ol-status">'+(isOnline?'กำลังใช้งาน':formatTime(u.last_seen))+'</div></div></li>';
+  }).join('');
+}
+
+function renderUpcomingEvents(events) {
+  const widget = document.getElementById('event-list');
+  if (!widget) return;
+  if (!events || events.length === 0) {
+    widget.innerHTML = '<li style="font-size:13px;color:var(--text-tertiary);padding:8px 16px">ยังไม่มีกำหนดการ</li>';
+    renderCalendar(); return;
+  }
+  const upcoming = [...events]
+    .filter(e => new Date(e.date) >= new Date(new Date().toDateString()))
+    .sort((a,b) => new Date(a.date) - new Date(b.date)).slice(0,4);
+  widget.innerHTML = upcoming.length ? upcoming.map(ev => eventLI(ev)).join('') :
+    '<li style="font-size:13px;color:var(--text-tertiary);padding:8px 16px">ไม่มีกำหนดการที่ใกล้จะมาถึง</li>';
+  renderCalendar();
+}
+
 /* ════════════════════════════════════════════
    LOAD DATA
 ════════════════════════════════════════════ */
 async function loadHome() {
-  await Promise.all([loadPosts(), loadOnlineUsers(), loadUpcomingEvents()]);
+  // โหลด 3 sheets พร้อมกัน (parallel) ลดเวลาจาก 3x → 1x
+  const [posts, users, events] = await Promise.all([
+    apiCached('Posts'), apiCached('Users'), apiCached('Events')
+  ]);
+  state.allEvents = events || [];
+  renderPosts(posts);
+  renderOnlineUsers(users);
+  renderUpcomingEvents(events);
 }
 
 /* ── POSTS ── */
@@ -222,7 +303,7 @@ async function loadPosts(filter = null) {
   if (!feed) return;
   feed.innerHTML = `<div class="loading-state"><i class="ti ti-loader-2" style="font-size:28px"></i><p>กำลังโหลด…</p></div>`;
 
-  const posts = await api({ action:'get', sheet:'Posts' });
+  const posts = await apiCached('Posts');
   if (!posts || posts.length === 0) {
     feed.innerHTML = `<div class="empty-state"><i class="ti ti-mood-empty" style="font-size:36px"></i><p>ยังไม่มีโพสต์ — เป็นคนแรกที่โพสต์เลย!</p></div>`;
     return;
@@ -318,7 +399,7 @@ async function loadBoard() {
   if (!list) return;
   list.innerHTML = `<div class="loading-state"><i class="ti ti-loader-2" style="font-size:24px"></i></div>`;
 
-  const items = await api({ action:'get', sheet:'Board' });
+  const items = await apiCached('Board');
   if (!items || items.length === 0) {
     list.innerHTML = `<div class="empty-state"><i class="ti ti-mood-empty" style="font-size:36px"></i><p>ยังไม่มีประกาศ</p></div>`;
     return;
@@ -521,7 +602,7 @@ async function submitPost() {
 
   input.innerText = '';
   if (btn) { btn.disabled = false; btn.textContent = 'โพสต์'; }
-  showToast(saved ? 'โพสต์แล้ว ✓' : 'โพสต์แล้ว (offline)');
+  invalidateCache('Posts'); showToast(saved ? 'โพสต์แล้ว ✓' : 'โพสต์แล้ว (offline)');
 }
 
 /* ════════════════════════════════════════════
@@ -637,7 +718,7 @@ function bindAll() {
     await api({ action:'create', sheet:'Board', author:user.name, title, tag, priority: tag==='ด่วน'?'urgent':'normal' });
     document.getElementById('board-title-input').value = '';
     document.getElementById('board-post-form').style.display = 'none';
-    showToast('โพสต์ประกาศแล้ว ✓'); loadBoard();
+    invalidateCache('Board'); showToast('โพสต์ประกาศแล้ว ✓'); loadBoard();
   });
   document.querySelectorAll('.board-filters .ff-tab').forEach(t => t.addEventListener('click', () => {
     document.querySelectorAll('.board-filters .ff-tab').forEach(x => x.classList.remove('active'));
