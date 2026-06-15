@@ -156,16 +156,7 @@
         <!-- RIGHT PANEL -->
         <aside class="feed-right" aria-label="แถบข้อมูลด้านขวา">
 
-          <!-- Stats — static display, จะเชื่อม Sheets ใน v2 -->
-          <div class="widget-card">
-            <div class="wc-head">สรุปวันนี้</div>
-            <div class="stat-grid">
-              <div class="stat-cell"><div class="stat-num urgent" id="stat-urgent">—</div><div class="stat-label">งานด่วน</div></div>
-              <div class="stat-cell"><div class="stat-num" id="stat-co">—</div><div class="stat-label">C/O รอดำเนิน</div></div>
-              <div class="stat-cell"><div class="stat-num" id="stat-ship">—</div><div class="stat-label">Shipment</div></div>
-              <div class="stat-cell"><div class="stat-num gold" id="stat-inv">—</div><div class="stat-label">Invoice ค้าง</div></div>
-            </div>
-          </div>
+
 
           <!-- Online members — มาจาก Users sheet -->
           <div class="widget-card">
@@ -512,5 +503,21 @@
 <script src="config.js"></script>
 <script src="firebase.js"></script>
 <script src="app.js"></script>
+<style>
+    .comment-section{border-top:0.5px solid var(--border,#E4E6EB);padding:10px 16px}
+    .comment-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+    .cmt-item{display:flex;gap:8px;align-items:flex-start}
+    .cmt-bubble{background:var(--bg-subtle,#F0F2F5);border-radius:12px;padding:7px 11px;flex:1}
+    .cmt-author{font-size:12px;font-weight:600;color:var(--text-primary,#050505);margin-bottom:2px}
+    .cmt-text{font-size:13px;color:var(--text-primary,#050505);line-height:1.5}
+    .cmt-time{font-size:10px;color:var(--text-tertiary,#94A3B8);margin-top:3px}
+    .comment-input-row{display:flex;gap:8px;align-items:center}
+    .cmt-input{flex:1;padding:7px 12px;border:1px solid var(--border,#E4E6EB);border-radius:20px;
+      font-size:13px;background:var(--bg-subtle,#F0F2F5);color:var(--text-primary,#050505);
+      outline:none;font-family:inherit}
+    .cmt-input:focus{border-color:var(--accent,#1D4E8F)}
+    .like-btn.liked{color:var(--accent,#1D4E8F);font-weight:600}
+    .like-btn.liked i{color:var(--accent,#1D4E8F)}
+</style>
 </body>
 </html>

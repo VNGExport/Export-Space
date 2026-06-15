@@ -489,14 +489,26 @@ function postCard(p) {
           ? `<div class="react-icons"><span class="react-icon" style="background:#2563EB">👍</span></div><span>${likes} คน</span>`
           : `<span style="color:var(--text-tertiary);font-size:13px">ยังไม่มีปฏิกิริยา</span>`}
       </div>
-      <span>0 ความคิดเห็น</span>
+      <span class="comment-count" data-post-id="${esc(p.id)}">${parseInt(p.comments)||0} ความคิดเห็น</span>
     </div>
     <div class="post-actions">
       <button class="post-action-btn like-btn" data-post-id="${esc(p.id)}">
         <i class="ti ti-thumb-up" aria-hidden="true"></i> ถูกใจ
       </button>
-      <button class="post-action-btn"><i class="ti ti-message" aria-hidden="true"></i> ความคิดเห็น</button>
-      <button class="post-action-btn"><i class="ti ti-share" aria-hidden="true"></i> แชร์</button>
+      <button class="post-action-btn comment-btn" data-post-id="${esc(p.id)}">
+        <i class="ti ti-message" aria-hidden="true"></i> ความคิดเห็น
+      </button>
+      <button class="post-action-btn share-btn" data-post-id="${esc(p.id)}" data-author="${esc(p.author||'')}">
+        <i class="ti ti-share" aria-hidden="true"></i> แชร์
+      </button>
+    </div>
+    <!-- comment section (hidden by default) -->
+    <div class="comment-section" id="cmts-${esc(p.id)}" style="display:none">
+      <div class="comment-list" id="cmt-list-${esc(p.id)}"></div>
+      <div class="comment-input-row">
+        <div class="avatar" style="background:${nameColor(state.user?.name||''||'')}; width:30px;height:30px;font-size:11px;flex-shrink:0" aria-hidden="true">${initials(state.user?.name||'?')}</div>
+        <input class="cmt-input" type="text" placeholder="เขียนความคิดเห็น… (Enter ส่ง)" data-post-id="${esc(p.id)}" maxlength="300">
+      </div>
     </div>
   </article>`;
 }
@@ -598,6 +610,9 @@ async function submitPost() {
   const card = div.firstElementChild;
   card.querySelector('.like-btn')?.addEventListener('click', onLike);
   card.querySelector('.post-more-btn')?.addEventListener('click', onPostMenu);
+  card.querySelector('.comment-btn')?.addEventListener('click', onToggleComment);
+  card.querySelector('.share-btn')?.addEventListener('click', onShare);
+  card.querySelector('.cmt-input')?.addEventListener('keydown', onCommentSubmit);
   feed?.insertBefore(card, feed.firstChild);
 
   input.innerText = '';
@@ -610,27 +625,179 @@ async function submitPost() {
 /* ════════════════════════════════════════════
    LIKE
 ════════════════════════════════════════════ */
+/* ════════════════════════════════════════════
+   COMMENT
+════════════════════════════════════════════ */
+function onToggleComment(e) {
+  const btn    = e.currentTarget;
+  const postId = btn.dataset.postId;
+  const section = document.getElementById('cmts-' + postId);
+  if (!section) return;
+  const isOpen = section.style.display !== 'none';
+  section.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) {
+    loadComments(postId);
+    section.querySelector('.cmt-input')?.focus();
+  }
+}
+
+function getComments(postId) {
+  try { return JSON.parse(localStorage.getItem('ex-cmt-'+postId)||'[]'); } catch(e) { return []; }
+}
+function saveComment(postId, text) {
+  const cmts = getComments(postId);
+  cmts.push({ author: state.user?.name||'ผู้ใช้', text, ts: new Date().toISOString() });
+  localStorage.setItem('ex-cmt-'+postId, JSON.stringify(cmts));
+  return cmts;
+}
+
+function loadComments(postId) {
+  const listEl = document.getElementById('cmt-list-'+postId);
+  if (!listEl) return;
+  const cmts = getComments(postId);
+  if (!cmts.length) {
+    listEl.innerHTML = '<div style="font-size:12px;color:var(--text-tertiary);padding:8px 0">ยังไม่มีความคิดเห็น</div>';
+    return;
+  }
+  listEl.innerHTML = cmts.map(c => {
+    const ini = initials(c.author||'?');
+    const col = nameColor(c.author||'');
+    return `<div class="cmt-item">
+      <div class="avatar" style="background:${col};width:28px;height:28px;font-size:10px;flex-shrink:0" aria-hidden="true">${esc(ini)}</div>
+      <div class="cmt-bubble">
+        <div class="cmt-author">${esc(c.author)}</div>
+        <div class="cmt-text">${esc(c.text)}</div>
+        <div class="cmt-time">${formatTime(c.ts)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function onCommentSubmit(e) {
+  if (e.key !== 'Enter') return;
+  const input  = e.currentTarget;
+  const postId = input.dataset.postId;
+  const text   = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  const cmts = saveComment(postId, text);
+
+  // อัปเดต count
+  const countEl = document.querySelector(`.comment-count[data-post-id="${postId}"]`);
+  if (countEl) countEl.textContent = `${cmts.length} ความคิดเห็น`;
+
+  loadComments(postId);
+  showToast('แสดงความคิดเห็นแล้ว ✓');
+}
+
+/* ════════════════════════════════════════════
+   SHARE
+════════════════════════════════════════════ */
+function onShare(e) {
+  const btn    = e.currentTarget;
+  const postId = btn.dataset.postId;
+  const author = btn.dataset.author;
+  const card   = btn.closest('.post-card');
+  const text   = card?.querySelector('.post-body p')?.innerText || '';
+  const shareText = `[ExportSpace] ${author}:\n${text}`;
+
+  if (navigator.share) {
+    navigator.share({ title:'ExportSpace Post', text: shareText }).catch(()=>{});
+  } else {
+    navigator.clipboard.writeText(shareText)
+      .then(() => showToast('คัดลอก link แล้ว ✓'))
+      .catch(() => showToast('ไม่สามารถแชร์ได้'));
+  }
+}
+
+/* ════════════════════════════════════════════
+   IMAGE / FILE ATTACH
+════════════════════════════════════════════ */
+function bindAttachButtons() {
+  const imgBtn  = document.querySelector('.cp-action[aria-label="แนบรูปภาพ"]');
+  const fileBtn = document.querySelector('.cp-action[aria-label="แนบไฟล์"]');
+
+  // สร้าง hidden input ครั้งเดียว
+  if (!document.getElementById('img-picker')) {
+    const img = document.createElement('input');
+    img.type='file'; img.id='img-picker'; img.accept='image/*';
+    img.style.cssText='position:absolute;left:-9999px';
+    img.onchange = e => attachPreview(e.target.files[0], 'image');
+    document.body.appendChild(img);
+  }
+  if (!document.getElementById('file-picker')) {
+    const f = document.createElement('input');
+    f.type='file'; f.id='file-picker';
+    f.accept='.pdf,.doc,.docx,.xlsx,.csv,.txt';
+    f.style.cssText='position:absolute;left:-9999px';
+    f.onchange = e => attachPreview(e.target.files[0], 'file');
+    document.body.appendChild(f);
+  }
+
+  imgBtn?.addEventListener('click', () => document.getElementById('img-picker')?.click());
+  fileBtn?.addEventListener('click', () => document.getElementById('file-picker')?.click());
+}
+
+function attachPreview(file, type) {
+  if (!file) return;
+  const postInput = document.getElementById('post-input');
+  if (!postInput) return;
+
+  // เพิ่มชื่อไฟล์ใน input text
+  const cur  = postInput.innerText === (postInput.dataset.placeholder||'') ? '' : postInput.innerText;
+  const tag  = type === 'image' ? `📷 ${file.name}` : `📎 ${file.name}`;
+  postInput.innerText = cur ? `${cur}\n${tag}` : tag;
+  postInput.focus();
+  showToast(`แนบ ${file.name} แล้ว (อยู่ในข้อความ)`);
+
+  // Note: การอัปโหลดจริงต้องใช้ Google Drive API หรือ Firebase Storage
+  // ในเวอร์ชันนี้จะแนบชื่อไฟล์ไว้ในข้อความก่อน
+}
+
+/* liked post IDs เก็บใน localStorage — คงอยู่ข้ามเซสชัน */
+function getLikedSet() {
+  try { return new Set(JSON.parse(localStorage.getItem('ex-liked')||'[]')); } catch(e) { return new Set(); }
+}
+function saveLikedSet(s) { localStorage.setItem('ex-liked', JSON.stringify([...s])); }
+
+function restoreLikedState(container) {
+  const liked = getLikedSet();
+  container.querySelectorAll('.like-btn[data-post-id]').forEach(btn => {
+    if (liked.has(btn.dataset.postId)) btn.classList.add('liked');
+  });
+}
+
 async function onLike(e) {
   const btn    = e.currentTarget;
   const postId = btn.dataset.postId;
-  const liked  = btn.classList.toggle('liked');
+  const likedSet = getLikedSet();
+  const alreadyLiked = likedSet.has(postId);
+
+  // toggle
+  const nowLiked = !alreadyLiked;
+  btn.classList.toggle('liked', nowLiked);
+
+  // persist state
+  if (nowLiked) likedSet.add(postId); else likedSet.delete(postId);
+  saveLikedSet(likedSet);
 
   // อัปเดต UI ทันที
-  const card   = btn.closest('.post-card');
+  const card    = btn.closest('.post-card');
   const summary = card?.querySelector('.post-react-summary');
   if (summary) {
-    const cur = parseInt(card.dataset.likes||'0') + (liked ? 1 : -1);
-    card.dataset.likes = Math.max(0, cur);
+    const cur = Math.max(0, parseInt(card.dataset.likes||'0') + (nowLiked ? 1 : -1));
+    card.dataset.likes = cur;
     summary.innerHTML = cur > 0
       ? `<div class="react-icons"><span class="react-icon" style="background:#2563EB">👍</span></div><span>${cur} คน</span>`
-      : `<span style="color:var(--text-tertiary);font-size:13px">ยังไม่มีปฏิกิริยา</span>`;
+      : '<span style="color:var(--text-tertiary);font-size:13px">ยังไม่มีปฏิกิริยา</span>';
   }
 
-  if (liked && postId && !postId.startsWith('tmp-')) {
+  // ส่งไป Sheets เฉพาะตอน like (ไม่ unlike เพราะ Sheets ไม่มี unlike)
+  if (nowLiked && postId && !postId.startsWith('tmp-')) {
     await api({ action:'like', id:postId });
     invalidateCache('Posts');
   }
-  showToast(liked ? '👍 ถูกใจแล้ว' : 'เอาถูกใจออก');
+  showToast(nowLiked ? '👍 ถูกใจแล้ว' : 'เอาถูกใจออก');
 }
 
 /* ════════════════════════════════════════════
@@ -695,6 +862,8 @@ function switchPage(pageId) {
    BIND ALL
 ════════════════════════════════════════════ */
 function bindAll() {
+  // attach buttons
+  bindAttachButtons();
   // nav
   document.querySelectorAll('.nctab').forEach(b => b.addEventListener('click', () => switchPage(b.dataset.page)));
   document.querySelectorAll('.sb-item').forEach(b => b.addEventListener('click', () => switchPage(b.dataset.page)));
